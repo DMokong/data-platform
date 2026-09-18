@@ -19,8 +19,10 @@
 //
 // Claim-check. Temporal limits a payload to 2 MB, and one hourly dolt_history_issues window is
 // about 6 MB. So FetchWindow parks the rows in a spool file under <root>/local/spool/ and hands
-// the workflow only a SpoolRef (path, row count, fetch instant); WriteWindow redeems the ref. The
-// spool is deleted only after WriteWindow succeeds, so a retried WriteWindow always finds it.
+// the workflow only a SpoolRef (path, row count, fetch instant); WriteWindow redeems the ref.
+// WriteWindow never deletes the spool, so every retry of it finds the file. DeleteSpool runs once
+// WriteWindow has finished: after it succeeds, and also after it has failed for good (retries
+// exhausted or a non-retryable error), because no later activity could redeem that spool.
 //
 // Schedule. ApplySchedule upserts one Temporal Schedule per source at the source's declared
 // cadence. It starts MaterialiseSource, skips a tick while the previous run is still going, and
