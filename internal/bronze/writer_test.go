@@ -534,14 +534,20 @@ func TestWrite_ProvenanceColumns_AC06(t *testing.T) {
 }
 
 // AC-06: a batch that already carries a column named like a provenance column is rejected, for
-// every one of the four provenance names.
+// every one of the four provenance names, in any letter case, and nothing is written. Case matters
+// because DuckDB resolves column names case-insensitively: a batch column "_EXTRACTED_AT" would
+// make DuckDB rename the real provenance column to "_extracted_at_1", so `select _extracted_at`
+// would return the batch's value instead of the provenance.
 func TestWrite_RejectsProvenanceNamedColumn_AC06(t *testing.T) {
-	root := t.TempDir()
-	wr := &Writer{Root: root}
 	w := mustHourWindow(2026, 9, 15, 13)
 
-	for _, bad := range []string{ColExtractedAt, ColWindowStart, ColWindowEnd, ColSourceFile} {
+	var names []string
+	for _, p := range []string{ColExtractedAt, ColWindowStart, ColWindowEnd, ColSourceFile} {
+		names = append(names, p, strings.ToUpper(p), strings.ToUpper(p[:2])+p[2:])
+	}
+	for _, bad := range names {
 		t.Run(bad, func(t *testing.T) {
+			root := t.TempDir()
 			batch := record.Batch{
 				Columns: []record.Column{
 					{Name: "id", Kind: record.Int64},
@@ -549,9 +555,16 @@ func TestWrite_RejectsProvenanceNamedColumn_AC06(t *testing.T) {
 				},
 				Rows: [][]any{{int64(1), "x"}},
 			}
-			_, err := wr.Write(context.Background(), Raw, "beads/events", w, batch, time.Date(2026, 9, 15, 13, 0, 0, 0, time.UTC))
+			_, err := (&Writer{Root: root}).Write(context.Background(), Raw, "beads/events", w, batch, time.Date(2026, 9, 15, 13, 0, 0, 0, time.UTC))
 			if err == nil {
 				t.Errorf("Write with an input column named %q returned a nil error, want rejection", bad)
+			}
+			entries, err := os.ReadDir(root)
+			if err != nil {
+				t.Fatalf("ReadDir: %v", err)
+			}
+			if len(entries) != 0 {
+				t.Errorf("rejected Write created %d entries under Root, want none", len(entries))
 			}
 		})
 	}

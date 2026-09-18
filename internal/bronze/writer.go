@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/parquet-go/parquet-go"
@@ -17,13 +18,26 @@ import (
 )
 
 // Provenance column names. The Writer appends these four columns, in this order, after a
-// batch's own columns, and rejects a batch that already carries any of them.
+// batch's own columns, and rejects a batch that already carries any of them, in any letter case.
 const (
 	ColExtractedAt = "_extracted_at"
 	ColWindowStart = "_window_start"
 	ColWindowEnd   = "_window_end"
 	ColSourceFile  = "_source_file"
 )
+
+// provenanceCollision reports which provenance column, if any, a batch column name collides
+// with. The match ignores letter case because DuckDB resolves column names case-insensitively: a
+// batch column "_EXTRACTED_AT" would make DuckDB rename the real provenance column to
+// "_extracted_at_1", and `select _extracted_at` would then read the batch's value.
+func provenanceCollision(name string) (string, bool) {
+	for _, p := range [...]string{ColExtractedAt, ColWindowStart, ColWindowEnd, ColSourceFile} {
+		if strings.EqualFold(name, p) {
+			return p, true
+		}
+	}
+	return "", false
+}
 
 // Writer writes one Parquet file per window under Root, at the path Path derives from the
 // window, replacing any earlier file for the same window.
@@ -84,9 +98,8 @@ func (wr *Writer) Write(ctx context.Context, zone Zone, dataset string, w window
 		return Result{}, fmt.Errorf("bronze: invalid batch: %w", err)
 	}
 	for _, c := range b.Columns {
-		switch c.Name {
-		case ColExtractedAt, ColWindowStart, ColWindowEnd, ColSourceFile:
-			return Result{}, fmt.Errorf("bronze: batch column %q collides with a provenance column the Writer adds", c.Name)
+		if p, ok := provenanceCollision(c.Name); ok {
+			return Result{}, fmt.Errorf("bronze: batch column %q collides with provenance column %q, which the Writer adds", c.Name, p)
 		}
 	}
 	rel, err := Path(zone, dataset, w)
