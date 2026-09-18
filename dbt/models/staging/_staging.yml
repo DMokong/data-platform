@@ -1,0 +1,141 @@
+version: 2
+
+models:
+  - name: stg_beads__events
+    description: One row per beads event, deduplicated on id, keeping the greatest _extracted_at.
+    columns:
+      - name: event_id
+        data_tests:
+          - unique
+          - not_null
+      - name: issue_id
+        data_tests:
+          - not_null
+        # The events -> issue_snapshots relationships check (error severity, restricted to avoid
+        # the extraction race) is dbt/tests/assert_events_issue_id_exists.sql, not the built-in
+        # `relationships` generic test: dbt-core 1.12.5's generic-test config parser rejects any
+        # macro, including the built-in `ref()`, inside a `where` config value ("the generic test
+        # configuration parser currently does not support using custom macros to populate
+        # configuration values" -- confirmed live against this install). A singular test gets full
+        # Jinja, so it is the correct, DAG-aware way to express the same restricted-relationships
+        # check here.
+      - name: event_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['created', 'updated', 'status_changed', 'commented', 'closed', 'reopened',
+                  'dependency_added', 'dependency_removed', 'label_added', 'label_removed',
+                  'compacted', 'claimed']
+              config:
+                severity: warn
+
+  - name: stg_beads__issue_snapshots
+    description: One row per issue per daily snapshot (current state, time travel AS OF).
+    data_tests:
+      - unique:
+          column_name: "issue_id || '|' || snapshot_date"
+      - not_null:
+          column_name: "issue_id || '|' || snapshot_date"
+    columns:
+      - name: issue_id
+        data_tests:
+          - not_null
+      - name: snapshot_date
+        data_tests:
+          - not_null
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['open', 'in_progress', 'blocked', 'deferred', 'closed']
+      - name: issue_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['bug', 'feature', 'task', 'epic', 'chore', 'decision', 'event']
+
+  - name: stg_beads__issue_history
+    description: One row per issue per Dolt commit that touched it.
+    data_tests:
+      - unique:
+          column_name: "issue_id || '|' || commit_hash"
+      - not_null:
+          column_name: "issue_id || '|' || commit_hash"
+    columns:
+      - name: issue_id
+        data_tests:
+          - not_null
+      - name: commit_hash
+        data_tests:
+          - not_null
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['open', 'in_progress', 'blocked', 'deferred', 'closed']
+      - name: issue_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['bug', 'feature', 'task', 'epic', 'chore', 'decision', 'event']
+
+  - name: stg_beads__commits
+    description: One row per Dolt commit.
+    columns:
+      - name: commit_hash
+        data_tests:
+          - unique
+          - not_null
+
+  - name: stg_beads__comment_snapshots
+    description: One row per comment per daily snapshot.
+    data_tests:
+      - unique:
+          column_name: "comment_id || '|' || snapshot_date"
+      - not_null:
+          column_name: "comment_id || '|' || snapshot_date"
+    columns:
+      - name: comment_id
+        data_tests:
+          - not_null
+      - name: snapshot_date
+        data_tests:
+          - not_null
+
+  - name: stg_beads__dependency_snapshots
+    description: >
+      One row per dependency edge per daily snapshot. Key is (dependency_id, snapshot_date):
+      verified unique against the live bronze data (1874 rows, 1874 distinct (id, dt) pairs, 0 null
+      ids; `id` alone repeats across snapshot_dates because a dependency edge persists across daily
+      snapshots once created). No schema evolution was observed on this table across the backfilled
+      range (2026-08-21 to present): every file carries the same 15-column schema.
+    data_tests:
+      - unique:
+          column_name: "dependency_id || '|' || snapshot_date"
+      - not_null:
+          column_name: "dependency_id || '|' || snapshot_date"
+    columns:
+      - name: dependency_id
+        data_tests:
+          - not_null
+      - name: snapshot_date
+        data_tests:
+          - not_null
+
+  - name: stg_beads__label_snapshots
+    description: One row per issue label per daily snapshot.
+    data_tests:
+      - unique:
+          column_name: "issue_id || '|' || label || '|' || snapshot_date"
+      - not_null:
+          column_name: "issue_id || '|' || label || '|' || snapshot_date"
+    columns:
+      - name: issue_id
+        data_tests:
+          - not_null
+      - name: label
+        data_tests:
+          - not_null
+      - name: snapshot_date
+        data_tests:
+          - not_null

@@ -1,0 +1,26 @@
+name: 'data_platform'
+version: '1.0.0'
+config-version: 2
+
+profile: 'data_platform'
+
+model-paths: ["models"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+clean-targets:
+  - "target"
+  - "logs"
+
+models:
+  data_platform:
+    staging:
+      +materialized: view
+      +tags: ["pre_go"]
+    marts:
+      pre_go:
+        +materialized: external
+        +tags: ["pre_go"]
+      post_go:
+        +materialized: external
+        +tags: ["post_go"]

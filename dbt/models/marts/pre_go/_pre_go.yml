@@ -1,0 +1,42 @@
+version: 2
+
+models:
+  - name: dim_issues
+    description: One row per issue, taken from the latest snapshot_date.
+    columns:
+      - name: issue_id
+        data_tests:
+          - unique
+          - not_null
+
+  - name: dim_issues_scd2
+    description: SCD Type 2 over daily issue snapshots (AC-25).
+    data_tests:
+      - unique:
+          column_name: "issue_id || '|' || valid_from"
+      - not_null:
+          column_name: "issue_id || '|' || valid_from"
+    # The remaining SCD2 invariants -- exactly one current row per issue, valid_to null iff
+    # is_current, and no overlapping intervals per issue -- are singular tests in dbt/tests/,
+    # because they compare rows across an issue's runs rather than testing one column.
+
+  - name: fct_issue_events
+    description: De-duplicated events enriched with the issue's current issue_type.
+    columns:
+      - name: event_id
+        data_tests:
+          - not_null
+
+  - name: mart_daily_throughput
+    description: Per local date, issues created, issues closed and event volume.
+    columns:
+      - name: dt
+        data_tests:
+          - not_null
+
+  - name: mart_agent_activity_hourly
+    description: Per UTC hour and actor, event and commit counts.
+    columns:
+      - name: dt
+        data_tests:
+          - not_null

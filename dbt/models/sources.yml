@@ -1,0 +1,54 @@
+version: 2
+
+sources:
+  - name: beads
+    description: >
+      Raw beads tables, read directly from bronze Parquet (spec §4: raw tables are external tables,
+      nothing loads them). This is the only file in the project that names a bronze path or calls
+      `read_parquet` (AC-20).
+    meta:
+      external_location: "read_parquet('bronze/raw/beads/{name}/*/*.parquet', hive_partitioning = true, union_by_name = true)"
+    loaded_at_field: _extracted_at
+    tables:
+      - name: events
+        description: >
+          Append-only event log, hourly windows. Freshness is generous (warn 48h, error 30d) because a
+          quiet source produces a window with zero rows, and a zero-row window carries no
+          `_extracted_at` value: freshness then reflects the last window that *did* have rows, not the
+          last window the Runner attempted (spec F1, F12; brief "Required content").
+        freshness:
+          warn_after: {count: 48, period: hour}
+          error_after: {count: 30, period: day}
+      - name: dolt_history_issues
+        description: Dolt's row history for `issues`, hourly windows on `commit_date`. Same freshness reasoning as events.
+        freshness:
+          warn_after: {count: 48, period: hour}
+          error_after: {count: 30, period: day}
+      - name: dolt_log
+        description: Dolt commit log, hourly windows on `date`. Same freshness reasoning as events.
+        freshness:
+          warn_after: {count: 48, period: hour}
+          error_after: {count: 30, period: day}
+      - name: issues
+        description: >
+          Daily snapshot of current issue state (time travel `AS OF`). A snapshot always carries at
+          least one row when the table is non-empty, so a stale snapshot means the Runner actually
+          stopped: freshness is tight (warn 6h, error 48h).
+        freshness:
+          warn_after: {count: 6, period: hour}
+          error_after: {count: 48, period: hour}
+      - name: comments
+        description: Daily snapshot of comments. Same freshness reasoning as issues.
+        freshness:
+          warn_after: {count: 6, period: hour}
+          error_after: {count: 48, period: hour}
+      - name: dependencies
+        description: Daily snapshot of issue dependency edges. Same freshness reasoning as issues.
+        freshness:
+          warn_after: {count: 6, period: hour}
+          error_after: {count: 48, period: hour}
+      - name: labels
+        description: Daily snapshot of issue labels. Same freshness reasoning as issues.
+        freshness:
+          warn_after: {count: 6, period: hour}
+          error_after: {count: 48, period: hour}
