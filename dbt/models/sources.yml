@@ -52,3 +52,21 @@ sources:
         freshness:
           warn_after: {count: 6, period: hour}
           error_after: {count: 48, period: hour}
+
+  - name: derived
+    description: >
+      Go transform outputs, read directly from bronze Parquet (spec §6: Go transforms write
+      bronze/derived/, declared as dbt sources). This is the only other file in the project that
+      names a bronze path or calls `read_parquet` (task 07's amendment to AC-20's "sources.yml
+      only" rule, for the derived zone).
+    meta:
+      external_location: "read_parquet('bronze/derived/{name}/*/*.parquet', hive_partitioning = true, union_by_name = true)"
+    loaded_at_field: _extracted_at
+    tables:
+      - name: issue_mentions
+        description: >
+          One row per (issue_id, mentioned_issue_id, field) mention the issue_mentions Go
+          transform found in dim_issues text, daily windows.
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 72, period: hour}

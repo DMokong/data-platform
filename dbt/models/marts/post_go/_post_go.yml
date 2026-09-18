@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: mart_issue_mention_drift
+    description: >
+      Grain (issue_id, mentioned_issue_id): mentions from the latest issue_mentions window that
+      have no dependency edge, in either direction, between the two issues in the latest
+      stg_beads__dependency_snapshots snapshot (AC-31). mention_count sums the source
+      mention_count across fields; field_count counts the distinct fields a mention appeared in;
+      mentioned_issue_exists reports whether mentioned_issue_id is a real dim_issues id.
+    data_tests:
+      - unique:
+          column_name: "issue_id || '|' || mentioned_issue_id"
+      - not_null:
+          column_name: "issue_id || '|' || mentioned_issue_id"
+    columns:
+      - name: issue_id
+        data_tests:
+          - not_null
+          # Mentions are extracted from dim_issues itself, so unlike the events -> issue_snapshots
+          # check (a singular test, restricted to avoid an extraction race; see
+          # dbt/models/staging/_staging.yml) this relationship needs no race filter, and is the
+          # project's first use of the built-in `relationships` generic test.
+          - relationships:
+              arguments:
+                to: ref('dim_issues')
+                field: issue_id
+              config:
+                severity: error
+      - name: mentioned_issue_id
+        data_tests:
+          - not_null
