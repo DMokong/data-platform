@@ -1,6 +1,6 @@
 ---
 stream: 2026-09-18-phase-1-build
-phase: plan
+phase: execute
 entry: spec
 conductor_model: opus (claude-opus-5, emulation mode, fable-mode loaded) — phases R-4
 weave:
@@ -14,9 +14,9 @@ target_repo: /Users/dustincheng/projects/data-platform
 
 | Task | Wave | Status | Fix rounds | Notes |
 |---|---|---|---|---|
-| 01-foundation | 1 | pending | 0 | trk-bam.1 · standard |
-| 02-writer | 2 | pending | 0 | trk-bam.2 · judgment · test-adversary after wave |
-| 03-beads-fetcher | 2 | pending | 0 | trk-bam.3 · judgment |
+| 01-foundation | 1 | done | 1 | trk-bam.1 · standard · commits b623ef1, 9f13608 · r1 finding: Range hang on unknown grain (fixed) · test-author section persisted by conductor (agent report-write blocked) |
+| 02-writer | 2 | running | 0 | trk-bam.2 · judgment · test-adversary after wave |
+| 03-beads-fetcher | 2 | running | 0 | trk-bam.3 · judgment |
 | 04-runner | 3 | pending | 0 | trk-bam.4 · standard |
 | 05-dbt-project | 4 | pending | 0 | trk-bam.5 · standard |
 | 06-temporal-ingest | 4 | pending | 0 | trk-bam.6 · judgment |
