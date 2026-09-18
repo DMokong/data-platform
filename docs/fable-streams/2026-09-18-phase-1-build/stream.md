@@ -18,9 +18,9 @@ target_repo: /Users/dustincheng/projects/data-platform
 | 02-writer | 2 | done | 2 | trk-bam.2 · judgment · edc3d83, 127a7d0, c494ff8 · r2 PASS; test-adversary: 7 survivors → hardened, 1 residue closed as an equivalent mutant (conductor probe); r3 (forceSyncErr seam) PASS · for final review: stale comments at writer_test.go:15, 918-944; the seam-only Sync mutant is an accepted blind spot |
 | 03-beads-fetcher | 2 | done | 0 | trk-bam.3 · judgment · 709dec4 · reviewer r1 PASS; conductor cross-checked counts vs direct Dolt queries (paused/resumed mid-wave) |
 | 04-runner | 3 | done | 1 | trk-bam.4 · standard · 26beb88 · r1 minor (claim order, process) → r2 PASS; conductor verified lookback windows, exit codes (binary), full backfill 80 s |
-| 05-dbt-project | 4 | running | 0 | trk-bam.5 · standard |
-| 06-temporal-ingest | 4 | running | 0 | trk-bam.6 · judgment |
-| 07-go-transform | 5 | pending | 0 | trk-bam.7 · standard · parallel |
-| 08-telemetry | 5 | pending | 0 | trk-bam.8 · standard · parallel |
+| 05-dbt-project | 4 | done | 0 | trk-bam.5 · standard · 49be8c8 · r1 PASS; conductor: 56/56 nodes, views-only, marts reconcile with Dolt (141 issues / 91 closed / 678 events) · events→issues relationships check is a singular test (dbt 1.12.5 rejects ref() in a generic where); generic relationships test added to 07 by brief amendment |
+| 06-temporal-ingest | 4 | done | 1 | trk-bam.6 · judgment · 9b5f7ab, 5b8d536 · r1 blocker (out-of-scope cmd/worker/main_test.go, removed) + minor doc → r2 PASS; conductor live run PASS in 8 s, 26 windows / 19,310 rows, spool empty · TA section persisted by conductor · for final review: cmd/worker has no tests |
+| 07-go-transform | 5 | running | 0 | trk-bam.7 · standard · parallel |
+| 08-telemetry | 5 | running | 0 | trk-bam.8 · standard · parallel |
 | 09-buildmarts | 6 | pending | 0 | trk-bam.9 · judgment |
 | 10-integration | 7 | pending | 0 | trk-bam.10 · standard |

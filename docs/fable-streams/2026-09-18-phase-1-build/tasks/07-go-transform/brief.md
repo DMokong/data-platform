@@ -128,6 +128,12 @@ is kept explicit: no `init()` side-effect registration.
   - Grain: (issue_id, mentioned_issue_id), with total `mention_count`, a count of distinct fields, and
     `mentioned_issue_exists` (whether the id is in `dim_issues`).
   - Tests: `unique` on `issue_id || '|' || mentioned_issue_id`, and `not_null` on both ids.
+  - **Conductor amendment (2026-09-19):** also declare dbt's built-in **`relationships` generic test** from
+    `mart_issue_mention_drift.issue_id` to `ref('dim_issues')`, field `issue_id`, at error severity. The
+    kickoff names `relationships` tests. The events → issues check in task 05 had to be a singular test,
+    because dbt-core 1.12.5 rejects `ref()` inside a generic test's `where` (see `dbt/models/staging/_staging.yml`).
+    This relationship needs no race filter: mentions are extracted from dim_issues itself, so the project
+    gets its first use of the generic test here.
 - No paths or `read_parquet` in any `.sql` file.
 
 **Tests (Go).**
