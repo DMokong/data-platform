@@ -44,6 +44,10 @@ Modify:
 
 Local, uncommitted artefacts you will create while verifying: `bronze/` and `local/tmp/`, both gitignored.
 
+**Concurrent work (conductor amendment, 2026-09-19).** The stream's test-adversary run may be hardening
+`internal/bronze/*_test.go` and writing scratch variants under `local/_testadv/` while you work. Those
+changes are not yours: do not commit, revert or review them, and keep your builds and tests package-scoped.
+
 **Git.** Commit when verification passes, and at the end of every fix round.
 - Stage only paths inside this File scope, with `git add -- <paths>`. Then commit with
   `git commit -m "<message>" -- <paths>`, so the commit contains only your paths even if a sibling task has
