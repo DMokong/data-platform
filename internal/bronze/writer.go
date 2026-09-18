@@ -59,6 +59,13 @@ type Result struct {
 // nil in production; only this package's own tests ever set it, and they reset it afterwards.
 var forceEncodeErr error
 
+// forceSyncErr, when non-nil, is taken as the result of syncing the temp file, and the real
+// tmp.Sync() is not called, as if the durability sync itself had failed. Write must still remove
+// the temp file and leave any existing target file untouched, exactly like any other failure
+// before the rename (AC-05). Always nil in production; only this package's own tests ever set it,
+// and they reset it afterwards.
+var forceSyncErr error
+
 // Fixed file settings. Everything that reaches the file's bytes is pinned here, so the output
 // depends only on the batch, the window and extractedAt (AC-04).
 const (
@@ -152,8 +159,12 @@ func replaceFile(ctx context.Context, target string, encodeTo func(io.Writer) er
 	if err := encodeTo(tmp); err != nil {
 		return 0, fmt.Errorf("encode: %w", err)
 	}
-	if err := tmp.Sync(); err != nil {
-		return 0, err
+	syncErr := forceSyncErr
+	if syncErr == nil {
+		syncErr = tmp.Sync()
+	}
+	if syncErr != nil {
+		return 0, syncErr
 	}
 	info, err := tmp.Stat()
 	if err != nil {

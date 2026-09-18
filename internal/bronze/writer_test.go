@@ -292,6 +292,17 @@ func TestWrite_RejectsInvalidInputsWithoutWriting(t *testing.T) {
 		{"unknown zone", Zone("gold"), "beads/events", good, okBatch},
 		{"dataset escapes the root", Raw, "../events", good, okBatch},
 		{"misaligned window", Raw, "beads/events", misaligned, okBatch},
+		// AC-03 (test-breaker round 1 / breaker-0 V1): a dataset segment outside ^[a-z0-9_]+$ by
+		// character class, not just the ".." escape above. The ".." case alone cannot catch a regex
+		// that lost its anchors (e.g. `^[a-z0-9_]+$` -> `[a-z0-9_]+`), since "." is outside [a-z0-9_]
+		// either way; these three cases each contain a valid lowercase substring ("beads"/"events")
+		// so only a correctly anchored, whole-segment match rejects them. Because this table drives
+		// Write (white-box, package bronze) rather than the exported Path directly, it exercises
+		// whichever Path implementation actually lives in this package, unlike a black-box test that
+		// imports bronze by its fixed module path.
+		{"dataset segment has uppercase", Raw, "Beads/events", good, okBatch},
+		{"dataset segment has a hyphen", Raw, "beads/ev-ents", good, okBatch},
+		{"dataset segment has a space", Raw, "beads/ev ents", good, okBatch},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -723,6 +734,259 @@ func TestWrite_ZeroRowBatchWritesFullSchema_AC07(t *testing.T) {
 			t.Errorf("zero-row file's schema is missing column %q", name)
 		}
 	}
+}
+
+// --- Hardening (round 2): test-breaker round-1 survivors -------------------------------------
+//
+// Each test below targets one specific survivor from
+// docs/fable-streams/2026-09-18-phase-1-build/tasks/02-writer/report.md's "## test-breaker —
+// round 1" sections (three concurrent breaker runs, breaker-0/1/2). Every one of these tests
+// passes against the accepted Writer and was verified, in a throwaway scratch copy under
+// local/_testadv/ (never committed), to fail against the exact mutation the named survivor
+// describes — except TestWrite_LargeBatchGoldenBytes_AC04, whose own doc comment explains why its
+// named survivor (breaker-1 v3) is disputed rather than closed.
+
+// largeBatchGoldenSHA256 is the SHA-256 of TestWrite_LargeBatchGoldenBytes_AC04's 60,000-row file,
+// recorded from the accepted Writer (parquet-go v0.32.0, zstd.Codec{Level: SpeedDefault,
+// Concurrency: 1}).
+const largeBatchGoldenSHA256 = "ecc4ddda5b9efcd8737562b7305a3b2512fa3997ad9cb8ef467a5b30461906f8"
+
+// AC-04 ("fixed writer options"): a large batch's bytes must still match a recorded hash, the same
+// property TestWrite_GoldenBytes_AC04 checks at a handful of rows, but at a scale (60,000 rows,
+// several hundred KB of page data) that crosses klauspost/zstd's internal block-splitting threshold
+// (128KB) and the parquet-go page buffer's default flush size (256KB) — so this test is strictly
+// more sensitive than the small golden test to any writer option that only diverges once the
+// encoder actually has to split its input into multiple blocks.
+//
+// NOTE on test-breaker round 1 / breaker-1 v3 ("ZSTD Concurrency tied to runtime.NumCPU() instead
+// of pinned at 1"): this test does NOT close that survivor, and no behavioral test of Write's
+// output bytes can, for the dependency versions pinned in this repo's go.mod. See this round's
+// report for the reproduction that shows why (a dispute, not a fix).
+func TestWrite_LargeBatchGoldenBytes_AC04(t *testing.T) {
+	root := t.TempDir()
+	w := mustHourWindow(2026, 9, 15, 19)
+	const n = 60000
+	col := []record.Column{{Name: "id", Kind: record.Int64}}
+	rows := make([][]any, n)
+	for i := 0; i < n; i++ {
+		rows[i] = []any{int64(i)}
+	}
+	batch := record.Batch{Columns: col, Rows: rows}
+	extractedAt := time.Date(2026, 9, 15, 19, 5, 0, 0, time.UTC)
+
+	res, err := (&Writer{Root: root}).Write(context.Background(), Raw, "beads/events", w, batch, extractedAt)
+	if err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if got := sha256File(t, filepath.Join(root, res.Path)); got != largeBatchGoldenSHA256 {
+		t.Errorf("60,000-row batch hashed to %s, want the recorded %s (see this test's comment)", got, largeBatchGoldenSHA256)
+	}
+}
+
+// AC-04 ("keep the ... row order exactly as given" / breaker-1 v2 — rows silently reordered once a
+// batch exceeds 3 rows). Every existing row-order-sensitive fixture (TestWrite_DeterministicBytes_AC04,
+// TestWrite_GoldenBytes_AC04, TestWrite_OverwriteIsAtomicNotAppend_AC05, TestWrite_ProvenanceColumns_AC06,
+// TestWrite_TypeRoundTrip_AC07) tops out at 3 rows, so a reordering bug gated on "len(rows) > 3" never
+// fires against them. This test writes 7 rows with deliberately non-monotonic, non-palindromic
+// (id, label) pairs, so a reversal, a sort, or any other reordering is directly observable by comparing
+// read-back position against input position, not just by hashing the whole file.
+func TestWrite_RowOrderPreservedAboveSmallBatches_AC04(t *testing.T) {
+	root := t.TempDir()
+	wr := &Writer{Root: root}
+	w := mustHourWindow(2026, 9, 15, 18)
+	col := []record.Column{{Name: "id", Kind: record.Int64}, {Name: "label", Kind: record.String}}
+	want := []struct {
+		id    int64
+		label string
+	}{
+		{5, "e"}, {1, "a"}, {4, "d"}, {2, "b"}, {7, "g"}, {3, "c"}, {6, "f"},
+	}
+	rows := make([][]any, len(want))
+	for i, r := range want {
+		rows[i] = []any{r.id, r.label}
+	}
+	batch := record.Batch{Columns: col, Rows: rows}
+
+	res, err := wr.Write(context.Background(), Raw, "beads/events", w, batch, time.Date(2026, 9, 15, 18, 5, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if res.Rows != len(want) {
+		t.Fatalf("Result.Rows = %d, want %d", res.Rows, len(want))
+	}
+
+	pf := openWritten(t, root, res.Path)
+	got := pf.readRows(t)
+	if len(got) != len(want) {
+		t.Fatalf("file has %d rows, want %d", len(got), len(want))
+	}
+	for i, w := range want {
+		gid, glabel := got[i]["id"], got[i]["label"]
+		if gid.IsNull() || gid.Int64() != w.id || glabel.IsNull() || string(glabel.ByteArray()) != w.label {
+			t.Errorf("row %d = (id=%v, label=%v), want (id=%d, label=%q) (rows must keep the batch's given order)",
+				i, gid, glabel, w.id, w.label)
+		}
+	}
+}
+
+// AC-07 ("NULLs stay NULL" / breaker-1 v4 — explicit empty string "" collapsed into NULL, and v5 —
+// explicit int64(0) collapsed into NULL). TestWrite_TypeRoundTrip_AC07's only String values are
+// "hello" and nil, and its only numeric values are non-zero, so a definition-level check that treats
+// a "falsy" value as absent (v == "" or v == int64(0), alongside the nil check) slips past every
+// existing fixture. This test supplies the explicit falsy value for every kind in one row and asserts
+// each comes back as its own value, not NULL.
+func TestWrite_FalsyValuesRoundTripNotNull_AC07(t *testing.T) {
+	root := t.TempDir()
+	wr := &Writer{Root: root}
+	w := mustHourWindow(2026, 9, 15, 22)
+	batch := record.Batch{
+		Columns: []record.Column{
+			{Name: "s", Kind: record.String},
+			{Name: "i", Kind: record.Int64},
+			{Name: "f", Kind: record.Float64},
+			{Name: "b", Kind: record.Bool},
+		},
+		Rows: [][]any{
+			{"", int64(0), 0.0, false},
+		},
+	}
+	res, err := wr.Write(context.Background(), Raw, "sample/kinds", w, batch, time.Date(2026, 9, 15, 22, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	pf := openWritten(t, root, res.Path)
+	rows := pf.readRows(t)
+	if len(rows) != 1 {
+		t.Fatalf("file has %d rows, want 1", len(rows))
+	}
+	row := rows[0]
+
+	if row["s"].IsNull() {
+		t.Error(`column "s" = NULL, want the empty string "" (breaker-1 v4: an explicit "" must not collapse to NULL)`)
+	} else if got := string(row["s"].ByteArray()); got != "" {
+		t.Errorf(`column "s" = %q, want ""`, got)
+	}
+	if row["i"].IsNull() {
+		t.Error(`column "i" = NULL, want 0 (breaker-1 v5: an explicit int64(0) must not collapse to NULL)`)
+	} else if got := row["i"].Int64(); got != 0 {
+		t.Errorf(`column "i" = %d, want 0`, got)
+	}
+	if row["f"].IsNull() {
+		t.Error(`column "f" = NULL, want 0 (the same falsy-value class as breaker-1 v4/v5, for Float64)`)
+	} else if got := row["f"].Double(); got != 0 {
+		t.Errorf(`column "f" = %v, want 0`, got)
+	}
+	if row["b"].IsNull() {
+		t.Error(`column "b" = NULL, want false (the same falsy-value class as breaker-1 v4/v5, for Bool)`)
+	} else if got := row["b"].Boolean(); got {
+		t.Errorf(`column "b" = %v, want false`, got)
+	}
+}
+
+// AC-07 ("written from the value's wall-clock fields, unchanged" / breaker-1 v6 — wallClockMicros
+// rounds a sub-microsecond nanosecond remainder instead of truncating it). Every batch Timestamp
+// value in the existing suite already lands exactly on a microsecond boundary, so rounding and
+// truncating agree on every fixture. This test uses a genuine 789ns sub-microsecond remainder, where
+// truncation gives .123456 and rounding gives .123457 — a real, one-microsecond-observable difference.
+func TestWrite_TimestampTruncatesNotRounds_AC07(t *testing.T) {
+	root := t.TempDir()
+	wr := &Writer{Root: root}
+	w := mustHourWindow(2026, 9, 15, 23)
+	ts := time.Date(2026, 9, 15, 13, 45, 30, 123456789, time.UTC)
+	batch := record.Batch{
+		Columns: []record.Column{{Name: "ts", Kind: record.Timestamp}},
+		Rows:    [][]any{{ts}},
+	}
+	res, err := wr.Write(context.Background(), Raw, "sample/kinds", w, batch, time.Date(2026, 9, 15, 23, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	pf := openWritten(t, root, res.Path)
+	rows := pf.readRows(t)
+	if len(rows) != 1 {
+		t.Fatalf("file has %d rows, want 1", len(rows))
+	}
+	want := time.Date(2026, 9, 15, 13, 45, 30, 123456000, time.UTC) // truncated; rounding would give ...457000
+	got := timestampValue(rows[0]["ts"])
+	if !got.Equal(want) {
+		t.Errorf("ts = %v, want %v (truncated to microseconds, not rounded)", got, want)
+	}
+}
+
+// --- AC-05 durability: fsync before rename (breaker-2 v5) --------------------------------------
+//
+// REQUIRED IMPLEMENTATION HOOK (not yet declared; read before running this test):
+// TestWrite_SyncFailureLeavesPriorFileIntact_AC05 below sets a package-level variable named
+// forceSyncErr, mirroring forceEncodeErr above. It does not exist yet and must be declared in a
+// non-test file (e.g. writer.go), consulted at the exact call site that syncs the temp file before
+// close/rename, for example:
+//
+//	// forceSyncErr, when non-nil, is returned by (*Writer).Write in place of tmp.Sync()'s own
+//	// result, as if the durability sync itself had failed. Write must still remove the temp file
+//	// and leave any existing target file untouched, exactly like any other pre-rename failure
+//	// (AC-05). Always nil in production; only this package's own tests ever set it, and they
+//	// reset it afterwards.
+//	var forceSyncErr error
+//
+//	if err := tmp.Sync(); err != nil {
+//		return 0, err
+//	}
+//	if forceSyncErr != nil {
+//		return 0, forceSyncErr
+//	}
+//
+// Placing the check immediately after the real tmp.Sync() call (rather than replacing it) means this
+// seam only proves the sync step's call site is reached and its failure is handled — the same
+// assurance forceEncodeErr gives for encode failures, and the same reason AC-05's brief names "sync"
+// as an explicit step in Write's rules. Until the hook is declared, this identifier is undefined and
+// `go test ./internal/bronze/...` fails to build with "undefined: forceSyncErr" — a legitimate
+// failing-first result under this package's established Mode-A convention (see forceEncodeErr's own
+// history in this file), not a broken test.
+//
+// Why this test is needed: test-breaker round 1 / breaker-2 v5 removed the writer's single
+// tmp.Sync() call. Every existing AC-05 test (Overwrite, EncodeFailure, ContextCancelled) only
+// inspects the *final* filesystem state after Write returns — final bytes, row counts, presence of
+// ".tmp-*" files, error/non-error outcomes — none of which a missing fsync changes in a normal,
+// non-crashing `go test` run (the OS page cache already serves the unsynced bytes, and os.Rename
+// still atomically swaps the unsynced temp file over the target). No test in this suite can observe
+// the durability gap itself without either crash injection or a seam at the sync call site; this is
+// the latter.
+func TestWrite_SyncFailureLeavesPriorFileIntact_AC05(t *testing.T) {
+	root := t.TempDir()
+	wr := &Writer{Root: root}
+	w := mustHourWindow(2026, 9, 15, 21)
+	col := []record.Column{{Name: "id", Kind: record.Int64}}
+
+	good := record.Batch{Columns: col, Rows: [][]any{{int64(1)}}}
+	res, err := wr.Write(context.Background(), Raw, "beads/events", w, good, time.Date(2026, 9, 15, 21, 5, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("initial (control) Write: %v", err)
+	}
+	abs := filepath.Join(root, res.Path)
+	before := sha256File(t, abs)
+
+	old := forceSyncErr
+	forceSyncErr = errors.New("bronze_test: injected sync failure")
+	t.Cleanup(func() { forceSyncErr = old })
+
+	changed := record.Batch{Columns: col, Rows: [][]any{{int64(2)}, {int64(3)}}}
+	_, err = wr.Write(context.Background(), Raw, "beads/events", w, changed, time.Date(2026, 9, 15, 21, 6, 0, 0, time.UTC))
+	if err == nil {
+		t.Fatal("Write with forceSyncErr set returned a nil error, want the injected failure")
+	}
+
+	after := sha256File(t, abs)
+	if after != before {
+		t.Errorf("target file changed after a failed-sync write: before=%s after=%s", before, after)
+	}
+	assertNoTempFiles(t, filepath.Dir(abs))
+
+	// The same failure on a window that has no file yet leaves no file at all.
+	fresh := mustHourWindow(2026, 9, 15, 22)
+	if _, err := wr.Write(context.Background(), Raw, "beads/events", fresh, changed, time.Date(2026, 9, 15, 22, 6, 0, 0, time.UTC)); err == nil {
+		t.Fatal("first Write of a fresh window with forceSyncErr set returned a nil error")
+	}
+	assertNoFileForWindow(t, root, fresh)
 }
 
 // --- Required content: sample file for manual DuckDB inspection --------------------------------
