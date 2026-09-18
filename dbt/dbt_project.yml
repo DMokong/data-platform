@@ -12,6 +12,13 @@ clean-targets:
   - "target"
   - "logs"
 
+# Buildable indirect selection: the post_go relationships test depends on both a pre_go model
+# (dim_issues) and the post_go mart it's declared on. Default "eager" selection would sweep it
+# into `--select tag:pre_go` before the mart exists; "buildable" only runs a test once all of its
+# parents are in the selected build, so it runs in the post_go pass instead.
+flags:
+  indirect_selection: buildable
+
 models:
   data_platform:
     staging:
