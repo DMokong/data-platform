@@ -1,6 +1,6 @@
 ---
 stream: 2026-09-18-phase-1-build
-phase: execute
+phase: finalize
 entry: spec
 conductor_model: opus (claude-opus-5, emulation mode, fable-mode loaded) — phases R-4
 weave:
