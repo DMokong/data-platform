@@ -22,5 +22,5 @@ target_repo: /Users/dustincheng/projects/data-platform
 | 06-temporal-ingest | 4 | done | 1 | trk-bam.6 · judgment · 9b5f7ab, 5b8d536 · r1 blocker (out-of-scope cmd/worker/main_test.go, removed) + minor doc → r2 PASS; conductor live run PASS in 8 s, 26 windows / 19,310 rows, spool empty · TA section persisted by conductor · for final review: cmd/worker has no tests |
 | 07-go-transform | 5 | done | 1 | trk-bam.7 · standard · parallel · af2afbd, 36e0a95, f69645a · r1 escalate (the conductor's own amendment; eager indirect selection) → ruled buildable → r2 PASS; conductor: 142 mentions, 0 self, drift 92 pairs / 0 dangling; top mention count reconciles with the source text · TA section persisted by conductor |
 | 08-telemetry | 5 | done | 0 | trk-bam.8 · standard · parallel · 82f4c35 · r1 PASS; conductor: stdout export of the real 56-node fixture gives 12 dbt.model + 44 dbt.test spans, platform metrics, OTLP default 127.0.0.1:4317 · TA section persisted by conductor |
-| 09-buildmarts | 6 | running | 0 | trk-bam.9 · judgment |
-| 10-integration | 7 | pending | 0 | trk-bam.10 · standard |
+| 09-buildmarts | 6 | done | 0 | trk-bam.9 · judgment · 43eccfd · r1 PASS; verifier cmd-1 gofmt hit was conductor scratch (ruled, cleaned) · conductor live run PASS in 15 s: ingest 26 windows → BuildMarts pre_go 56 / transform 142 / post_go 6, all spans present; default OTLP export to Alloy flushes cleanly · TA section persisted by conductor |
+| 10-integration | 7 | running | 0 | trk-bam.10 · standard |
