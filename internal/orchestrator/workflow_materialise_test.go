@@ -190,7 +190,10 @@ func TestMaterialiseWindow_DailyWindow_FourTables_AC33(t *testing.T) {
 // AC-34: MaterialiseSource, as of a fixed workflow.Now (env.SetStartTime), starts exactly one
 // MaterialiseWindow child per lookback window: 24 hourly + 2 daily for beads, each with the
 // deterministic workflow id "materialise/<source>/<grain>/<window>" -- no window missing, none
-// duplicated, none extra.
+// duplicated, none extra. AC-37: it also starts a BuildMarts child, id
+// "build-marts/<source>/<day>" (see TestMaterialiseSource_StartsBuildMartsWithDayWindowAfterSuccess_AC37
+// for BuildMarts's own input/ordering assertions; this test only confirms it is among the started
+// children by id, alongside every MaterialiseWindow child).
 func TestMaterialiseSource_StartsExpectedChildren_AC34(t *testing.T) {
 	var suite testsuite.WorkflowTestSuite
 	env := suite.NewTestWorkflowEnvironment()
@@ -213,9 +216,13 @@ func TestMaterialiseSource_StartsExpectedChildren_AC34(t *testing.T) {
 	for _, w := range daily {
 		wantIDs["materialise/beads/day/"+w.String()] = true
 	}
+	buildMartsID := "build-marts/beads/" + window.Containing(start, window.Day).String()
+	wantIDs[buildMartsID] = true
 
 	env.OnWorkflow(orchestrator.MaterialiseWindow, mock.Anything, mock.Anything).
 		Return(orchestrator.MaterialiseWindowResult{}, nil)
+	env.OnWorkflow(orchestrator.BuildMarts, mock.Anything, mock.Anything).
+		Return(orchestrator.BuildMartsResult{}, nil)
 
 	var mu sync.Mutex
 	gotIDs := map[string]int{}
@@ -252,7 +259,8 @@ func TestMaterialiseSource_StartsExpectedChildren_AC34(t *testing.T) {
 }
 
 // AC-34: if any MaterialiseWindow child fails, MaterialiseSource itself fails, and the returned
-// error names the failed child.
+// error names the failed child. AC-37: "MaterialiseSource starts BuildMarts only after all
+// ingestion children succeed" -- so when one fails, BuildMarts must never start at all.
 func TestMaterialiseSource_FailsWhenChildFails_AC34(t *testing.T) {
 	var suite testsuite.WorkflowTestSuite
 	env := suite.NewTestWorkflowEnvironment()
@@ -268,6 +276,11 @@ func TestMaterialiseSource_FailsWhenChildFails_AC34(t *testing.T) {
 	env.OnWorkflow(orchestrator.MaterialiseWindow, mock.Anything, mock.Anything).
 		Return(orchestrator.MaterialiseWindowResult{}, nil)
 
+	var buildMartsStarted bool
+	env.OnWorkflow(orchestrator.BuildMarts, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		buildMartsStarted = true
+	}).Return(orchestrator.BuildMartsResult{}, nil)
+
 	env.ExecuteWorkflow(orchestrator.MaterialiseSource, orchestrator.MaterialiseSourceInput{Source: "beads"})
 
 	if !env.IsWorkflowCompleted() {
@@ -279,5 +292,92 @@ func TestMaterialiseSource_FailsWhenChildFails_AC34(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), failID) {
 		t.Errorf("error %q does not name the failed child %q", err.Error(), failID)
+	}
+	if buildMartsStarted {
+		t.Errorf("BuildMarts started even though ingestion child %q failed (AC-37: it must start only after every ingestion child succeeds)", failID)
+	}
+}
+
+// AC-37: "MaterialiseSource starts BuildMarts with window.Containing(workflow.Now(ctx),
+// window.Day), a deterministic id build-marts/<source>/<day>, and reuse policy allow-duplicate."
+// This test pins the id and the input Window precisely, and proves BuildMarts starts only once
+// every MaterialiseWindow child has already completed successfully (not merely once they have all
+// been started): the MaterialiseWindow mock only increments a shared, mutex-guarded counter as
+// each one *finishes*, and BuildMarts's own mock captures that counter's value at the moment it is
+// invoked.
+func TestMaterialiseSource_StartsBuildMartsWithDayWindowAfterSuccess_AC37(t *testing.T) {
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+
+	start := time.Date(2026, 9, 15, 0, 30, 0, 0, time.UTC)
+	env.SetStartTime(start)
+	wantWindow := window.Containing(start, window.Day)
+	wantID := "build-marts/beads/" + wantWindow.String()
+
+	hourly, err := window.Lookback(start, window.Hour, 24)
+	if err != nil {
+		t.Fatalf("window.Lookback(hour): %v", err)
+	}
+	daily, err := window.Lookback(start, window.Day, 2)
+	if err != nil {
+		t.Fatalf("window.Lookback(day): %v", err)
+	}
+	wantChildren := len(hourly) + len(daily)
+
+	var mu sync.Mutex
+	completedChildren := 0
+	env.OnWorkflow(orchestrator.MaterialiseWindow, mock.Anything, mock.Anything).Return(
+		func(ctx workflow.Context, in orchestrator.MaterialiseWindowInput) (orchestrator.MaterialiseWindowResult, error) {
+			mu.Lock()
+			completedChildren++
+			mu.Unlock()
+			return orchestrator.MaterialiseWindowResult{Source: in.Source, Window: in.Window}, nil
+		})
+
+	var buildMartsCalls int
+	var buildMartsInput orchestrator.BuildMartsInput
+	var completedAtBuildMartsStart int
+	var idAtBuildMartsStart string
+	env.SetOnChildWorkflowStartedListener(func(info *workflow.Info, ctx workflow.Context, args converter.EncodedValues) {
+		if info.WorkflowExecution.ID != wantID {
+			return
+		}
+		mu.Lock()
+		idAtBuildMartsStart = info.WorkflowExecution.ID
+		completedAtBuildMartsStart = completedChildren
+		mu.Unlock()
+	})
+	env.OnWorkflow(orchestrator.BuildMarts, mock.Anything, mock.Anything).Return(
+		func(ctx workflow.Context, in orchestrator.BuildMartsInput) (orchestrator.BuildMartsResult, error) {
+			mu.Lock()
+			buildMartsCalls++
+			buildMartsInput = in
+			mu.Unlock()
+			return orchestrator.BuildMartsResult{}, nil
+		})
+
+	env.ExecuteWorkflow(orchestrator.MaterialiseSource, orchestrator.MaterialiseSourceInput{Source: "beads"})
+
+	if !env.IsWorkflowCompleted() {
+		t.Fatalf("MaterialiseSource did not complete")
+	}
+	if err := env.GetWorkflowError(); err != nil {
+		t.Fatalf("MaterialiseSource failed: %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if buildMartsCalls != 1 {
+		t.Fatalf("BuildMarts started %d times, want exactly 1", buildMartsCalls)
+	}
+	if buildMartsInput.Window != wantWindow {
+		t.Errorf("BuildMarts input Window = %v, want %v (window.Containing(workflow.Now(ctx), window.Day))", buildMartsInput.Window, wantWindow)
+	}
+	if idAtBuildMartsStart != wantID {
+		t.Errorf("BuildMarts child id = %q, want %q", idAtBuildMartsStart, wantID)
+	}
+	if completedAtBuildMartsStart != wantChildren {
+		t.Errorf("BuildMarts started after %d/%d MaterialiseWindow children had completed, want all %d to have completed first",
+			completedAtBuildMartsStart, wantChildren, wantChildren)
 	}
 }

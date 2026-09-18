@@ -19,9 +19,12 @@ const TaskQueue = "data-platform"
 const (
 	WorkflowMaterialiseSource = "MaterialiseSource"
 	WorkflowMaterialiseWindow = "MaterialiseWindow"
+	WorkflowBuildMarts        = "BuildMarts"
 	ActivityFetchWindow       = "FetchWindow"
 	ActivityWriteWindow       = "WriteWindow"
 	ActivityDeleteSpool       = "DeleteSpool"
+	ActivityDbtBuild          = "DbtBuild"
+	ActivityRunTransform      = "RunTransform"
 )
 
 // Declarations returns every declared source, keyed by source name. It is static data built from
@@ -37,7 +40,10 @@ func Declarations() map[string]source.Source {
 func Register(r worker.Registry, a *Activities) {
 	r.RegisterWorkflowWithOptions(MaterialiseSource, workflow.RegisterOptions{Name: WorkflowMaterialiseSource})
 	r.RegisterWorkflowWithOptions(MaterialiseWindow, workflow.RegisterOptions{Name: WorkflowMaterialiseWindow})
+	r.RegisterWorkflowWithOptions(BuildMarts, workflow.RegisterOptions{Name: WorkflowBuildMarts})
 	r.RegisterActivityWithOptions(a.FetchWindow, activity.RegisterOptions{Name: ActivityFetchWindow})
 	r.RegisterActivityWithOptions(a.WriteWindow, activity.RegisterOptions{Name: ActivityWriteWindow})
 	r.RegisterActivityWithOptions(a.DeleteSpool, activity.RegisterOptions{Name: ActivityDeleteSpool})
+	r.RegisterActivityWithOptions(a.DbtBuild, activity.RegisterOptions{Name: ActivityDbtBuild})
+	r.RegisterActivityWithOptions(a.RunTransform, activity.RegisterOptions{Name: ActivityRunTransform})
 }

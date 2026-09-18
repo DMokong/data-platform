@@ -53,13 +53,14 @@ type TableTotals struct {
 }
 
 // MaterialiseSourceResult totals a MaterialiseSource run: windows materialised, then rows and
-// bytes per table in declaration order and overall.
+// bytes per table in declaration order and overall, then what the BuildMarts child built.
 type MaterialiseSourceResult struct {
-	Source  string
-	Windows int
-	Rows    int
-	Bytes   int64
-	Tables  []TableTotals
+	Source     string
+	Windows    int
+	Rows       int
+	Bytes      int64
+	Tables     []TableTotals
+	BuildMarts BuildMartsResult
 }
 
 // retryPolicy is shared by every ingestion activity: first retry after 2 s, doubling, at most 5
@@ -205,11 +206,20 @@ func childWorkflowID(sourceName string, w window.Window) string {
 	return fmt.Sprintf("materialise/%s/%s/%s", sourceName, w.Grain, w)
 }
 
+// buildMartsWorkflowID is the deterministic id of the BuildMarts child a source's run starts for
+// one day, e.g. "build-marts/beads/2026-09-15".
+func buildMartsWorkflowID(sourceName string, day window.Window) string {
+	return fmt.Sprintf("build-marts/%s/%s", sourceName, day)
+}
+
 // MaterialiseSource re-extracts a source's lookback: for each grain, taken in declaration order,
 // it computes window.Lookback(workflow.Now, grain, lookback) and starts one MaterialiseWindow
 // child per window, all at once, with workflow id materialise/<source>/<grain>/<window> and reuse
 // policy allow-duplicate (the next run reuses the id). It waits for every child, then fails with
-// an error naming each failed child, or returns the totals.
+// an error naming each failed child. Only when every child succeeded does it start child
+// BuildMarts for the day containing that same workflow.Now instant, with workflow id
+// build-marts/<source>/<day> and reuse policy allow-duplicate, and wait for it: a failed BuildMarts
+// fails the run, and its result is part of the totals returned.
 func MaterialiseSource(ctx workflow.Context, in MaterialiseSourceInput) (MaterialiseSourceResult, error) {
 	res := MaterialiseSourceResult{Source: in.Source}
 	src, ok := Declarations()[in.Source]
@@ -269,6 +279,18 @@ func MaterialiseSource(ctx workflow.Context, in MaterialiseSourceInput) (Materia
 	if len(failed) > 0 {
 		return res, fmt.Errorf("materialise %s: %d of %d windows failed: %s",
 			src.Name, len(failed), len(children), strings.Join(failed, "; "))
+	}
+
+	// The day is taken from the same instant as the lookback windows, so the marts a run builds
+	// belong to the day it started in, even if ingestion finishes after midnight UTC.
+	day := window.Containing(now, window.Day)
+	id := buildMartsWorkflowID(src.Name, day)
+	bctx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
+		WorkflowID:            id,
+		WorkflowIDReusePolicy: enumspb.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE,
+	})
+	if err := workflow.ExecuteChildWorkflow(bctx, WorkflowBuildMarts, BuildMartsInput{Window: day}).Get(ctx, &res.BuildMarts); err != nil {
+		return res, fmt.Errorf("materialise %s: %s %s failed: %w", src.Name, WorkflowBuildMarts, id, err)
 	}
 	return res, nil
 }

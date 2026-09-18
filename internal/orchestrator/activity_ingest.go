@@ -11,19 +11,46 @@ import (
 	"go.temporal.io/sdk/temporal"
 
 	"github.com/DMokong/data-platform/internal/bronze"
+	"github.com/DMokong/data-platform/internal/dbt"
 	"github.com/DMokong/data-platform/internal/source"
+	"github.com/DMokong/data-platform/internal/telemetry"
+	"github.com/DMokong/data-platform/internal/transform"
 	"github.com/DMokong/data-platform/internal/window"
 )
 
-// Activities holds what the ingestion activities need: the source declarations, one Fetcher per
-// source, the bronze Writer and the spool directory. Its methods are the activities; Register
-// registers them under the Activity* names.
+// Activities holds what the activities need: the source declarations, one Fetcher per source,
+// the bronze Writer and the spool directory for ingestion, and the dbt Runner and transform Env
+// for building marts (the Go transforms write through the same Writer). Its methods are the
+// activities; Register registers them under the Activity* names.
 type Activities struct {
 	Sources  map[string]source.Source  // declarations by source name
 	Fetchers map[string]source.Fetcher // by source name
 	Writer   *bronze.Writer
 	SpoolDir string           // <root>/local/spool
-	Now      func() time.Time // extraction clock for FetchedAt; nil → time.Now
+	Now      func() time.Time // extraction clock for FetchedAt and transform output; nil → time.Now
+
+	DbtRunner    dbt.Runner    // runs dbt build from the repo root (WorkDir)
+	TransformEnv transform.Env // where Go transforms read mart Parquet: <root>/warehouse
+}
+
+// now reads the extraction clock.
+func (a *Activities) now() time.Time {
+	if a.Now == nil {
+		return time.Now()
+	}
+	return a.Now()
+}
+
+// recordActivity records one activity invocation on platform.activity.duration. Activities
+// defer it directly, with a pointer to their named error result, so the outcome is the error the
+// activity actually returns: defer recordActivity(ctx, name, time.Now(), &err). A panic counts as
+// a failure and is re-raised for the SDK to report.
+func recordActivity(ctx context.Context, name string, start time.Time, errp *error) {
+	if r := recover(); r != nil {
+		telemetry.RecordActivity(ctx, name, time.Since(start), fmt.Errorf("panic: %v", r))
+		panic(r)
+	}
+	telemetry.RecordActivity(ctx, name, time.Since(start), *errp)
 }
 
 // FetchWindowInput names one table of one source and the window to fetch.
@@ -54,7 +81,8 @@ func badSetup(format string, args ...any) error {
 // The spool file is <SpoolDir>/<source>/<table>/<window>-<run id>-<activity id>.gob, written to a
 // temp file in the same directory and renamed into place. A retry of this activity reads the
 // source again and rewrites the same path; only the attempt that completes hands its ref on.
-func (a *Activities) FetchWindow(ctx context.Context, in FetchWindowInput) (SpoolRef, error) {
+func (a *Activities) FetchWindow(ctx context.Context, in FetchWindowInput) (_ SpoolRef, err error) {
+	defer recordActivity(ctx, ActivityFetchWindow, time.Now(), &err)
 	if err := a.checkTable(in.Source, in.Table, in.Window); err != nil {
 		return SpoolRef{}, err
 	}
@@ -67,13 +95,9 @@ func (a *Activities) FetchWindow(ctx context.Context, in FetchWindowInput) (Spoo
 		return SpoolRef{}, err
 	}
 
-	now := a.Now
-	if now == nil {
-		now = time.Now
-	}
 	// Bronze stores _extracted_at in microseconds; truncating here keeps FetchedAt and the
 	// column exactly equal.
-	fetchedAt := now().UTC().Truncate(time.Microsecond)
+	fetchedAt := a.now().UTC().Truncate(time.Microsecond)
 
 	activity.RecordHeartbeat(ctx, "fetch: querying source")
 	batch, err := fetcher.Fetch(ctx, in.Table, in.Window)
@@ -112,7 +136,10 @@ func (a *Activities) FetchWindow(ctx context.Context, in FetchWindowInput) (Spoo
 // <source>/<table> for ref.Window, with ref.FetchedAt as _extracted_at. It does not delete the
 // spool; the workflow runs DeleteSpool once WriteWindow has succeeded, so a retry whose earlier
 // completion was lost still finds the file. The same ref always yields byte-identical bronze.
-func (a *Activities) WriteWindow(ctx context.Context, ref SpoolRef) (bronze.Result, error) {
+// A successful write adds its rows and bytes to platform.rows_written / platform.bytes_written
+// under (source, table, zone raw).
+func (a *Activities) WriteWindow(ctx context.Context, ref SpoolRef) (_ bronze.Result, err error) {
+	defer recordActivity(ctx, ActivityWriteWindow, time.Now(), &err)
 	if err := a.checkTable(ref.Source, ref.Table, ref.Window); err != nil {
 		return bronze.Result{}, err
 	}
@@ -138,12 +165,14 @@ func (a *Activities) WriteWindow(ctx context.Context, ref SpoolRef) (bronze.Resu
 		return bronze.Result{}, fmt.Errorf("orchestrator: %w", err)
 	}
 	activity.RecordHeartbeat(ctx, "write: bronze written")
+	telemetry.RecordWrite(ctx, ref.Source, ref.Table, string(bronze.Raw), res.Rows, res.Bytes)
 	return res, nil
 }
 
 // DeleteSpool removes the spool file ref points at. It is idempotent: a file that is already gone
 // counts as success.
-func (a *Activities) DeleteSpool(ctx context.Context, ref SpoolRef) error {
+func (a *Activities) DeleteSpool(ctx context.Context, ref SpoolRef) (err error) {
+	defer recordActivity(ctx, ActivityDeleteSpool, time.Now(), &err)
 	if err := a.checkSpoolPath(ref.Path); err != nil {
 		return err
 	}

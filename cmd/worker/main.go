@@ -12,13 +12,18 @@ import (
 	"time"
 
 	"go.temporal.io/sdk/client"
+	temporalotel "go.temporal.io/sdk/contrib/opentelemetry"
+	"go.temporal.io/sdk/interceptor"
 	tlog "go.temporal.io/sdk/log"
 	"go.temporal.io/sdk/worker"
 
 	"github.com/DMokong/data-platform/internal/bronze"
+	"github.com/DMokong/data-platform/internal/dbt"
 	"github.com/DMokong/data-platform/internal/orchestrator"
 	"github.com/DMokong/data-platform/internal/source"
 	"github.com/DMokong/data-platform/internal/source/beads"
+	"github.com/DMokong/data-platform/internal/telemetry"
+	"github.com/DMokong/data-platform/internal/transform"
 )
 
 // Temporal connection defaults. The address is 127.0.0.1, never localhost: localhost can resolve
@@ -34,6 +39,16 @@ const maxConcurrentActivities = 8
 
 // scheduleTimeout bounds each schedule upsert under -apply-schedule.
 const scheduleTimeout = 30 * time.Second
+
+// serviceName is the OpenTelemetry service.name of the worker's spans and metrics.
+const serviceName = "data-platform-worker"
+
+// telemetryShutdownTimeout bounds the final flush of spans and metrics when the worker stops, so
+// an unreachable collector cannot hold up the exit (the live script allows 10 s after SIGTERM).
+const telemetryShutdownTimeout = 5 * time.Second
+
+// defaultDbtBin is the dbt executable when PLATFORM_DBT_BIN is unset: "dbt" on PATH.
+const defaultDbtBin = "dbt"
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Getenv, os.Stdout, os.Stderr))
@@ -63,13 +78,24 @@ func workerOptions() worker.Options {
 	return worker.Options{MaxConcurrentActivityExecutionSize: maxConcurrentActivities}
 }
 
-// run parses args, connects to Temporal and either upserts the schedules (-apply-schedule) or
-// runs the worker until SIGINT / SIGTERM. It returns the process exit code: 2 for a usage error,
-// 1 for any other failure, 0 on success.
+// clientOptions are the options every Temporal client of this binary dials with; the worker adds
+// its tracing interceptor and metrics handler to them.
+func clientOptions(tcfg temporalConfig) client.Options {
+	return client.Options{
+		HostPort:  tcfg.Address,
+		Namespace: tcfg.Namespace,
+		// slog's default logger logs at INFO; the SDK's own default logs every command at DEBUG.
+		Logger: tlog.NewStructuredLogger(slog.Default()),
+	}
+}
+
+// run parses args, then either upserts the schedules (-apply-schedule) or runs the worker until
+// SIGINT / SIGTERM. It returns the process exit code: 2 for a usage error, 1 for any other
+// failure, 0 on success.
 func run(args []string, getenv func(string) string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("worker", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	root := fs.String("root", ".", "repo root; bronze is <root>/bronze, spool files go to <root>/local/spool")
+	root := fs.String("root", ".", "repo root; bronze is <root>/bronze, spool files go to <root>/local/spool, dbt runs from here")
 	applySchedule := fs.Bool("apply-schedule", false, "upsert the schedule of every declared source, then exit without starting a worker")
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "Usage: worker [-root DIR] [-apply-schedule]")
@@ -85,26 +111,61 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	}
 
 	tcfg := temporalConfigFromEnv(getenv)
-	c, err := client.Dial(client.Options{
-		HostPort:  tcfg.Address,
-		Namespace: tcfg.Namespace,
-		// slog's default logger logs at INFO; the SDK's own default logs every command at DEBUG.
-		Logger: tlog.NewStructuredLogger(slog.Default()),
+	if *applySchedule {
+		c, err := client.Dial(clientOptions(tcfg))
+		if err != nil {
+			fmt.Fprintf(stderr, "worker: connect to Temporal at %s (namespace %s): %v\n", tcfg.Address, tcfg.Namespace, err)
+			return 1
+		}
+		defer c.Close()
+		return applySchedules(c, orchestrator.Declarations(), stdout, stderr)
+	}
+	return runWorker(*root, tcfg, getenv, stdout, stderr)
+}
+
+// runWorker sets up telemetry first, so the Temporal client's tracing interceptor and metrics
+// handler and the platform's own instruments all use the global providers it installs; then it
+// connects, registers every workflow and activity, and polls until SIGINT / SIGTERM. Telemetry
+// is shut down last, after the worker has stopped, which flushes the spans and metrics still
+// buffered (with PLATFORM_OTEL_EXPORTER=stdout, onto stdout).
+func runWorker(root string, tcfg temporalConfig, getenv func(string) string, stdout, stderr io.Writer) int {
+	telCfg := telemetry.ConfigFromEnv(serviceName)
+	telCfg.Stdout = stdout
+	shutdownTelemetry, err := telemetry.Setup(context.Background(), telCfg)
+	if err != nil {
+		fmt.Fprintln(stderr, "worker:", err)
+		return 1
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), telemetryShutdownTimeout)
+		defer cancel()
+		if err := shutdownTelemetry(ctx); err != nil {
+			fmt.Fprintln(stderr, "worker: telemetry shutdown:", err)
+		}
+	}()
+
+	tracing, err := temporalotel.NewTracingInterceptor(temporalotel.TracerOptions{})
+	if err != nil {
+		fmt.Fprintln(stderr, "worker: tracing interceptor:", err)
+		return 1
+	}
+	opts := clientOptions(tcfg)
+	opts.Interceptors = []interceptor.ClientInterceptor{tracing}
+	opts.MetricsHandler = temporalotel.NewMetricsHandler(temporalotel.MetricsHandlerOptions{
+		// The handler's default reaction to a meter error is to panic; a metric is not worth the
+		// worker.
+		OnError: func(err error) { slog.Warn("temporal metrics handler", "error", err) },
 	})
+	c, err := client.Dial(opts)
 	if err != nil {
 		fmt.Fprintf(stderr, "worker: connect to Temporal at %s (namespace %s): %v\n", tcfg.Address, tcfg.Namespace, err)
 		return 1
 	}
 	defer c.Close()
 
-	sources := orchestrator.Declarations()
-	if *applySchedule {
-		return applySchedules(c, sources, stdout, stderr)
-	}
-
-	absRoot, err := filepath.Abs(*root)
+	absRoot, err := filepath.Abs(root)
 	if err != nil {
-		fmt.Fprintf(stderr, "worker: -root %q: %v\n", *root, err)
+		fmt.Fprintf(stderr, "worker: -root %q: %v\n", root, err)
 		return 1
 	}
 	bcfg, err := beads.ConfigFromEnv()
@@ -119,17 +180,23 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	}
 	defer fetcher.Close()
 
+	dbtBin := getenv("PLATFORM_DBT_BIN")
+	if dbtBin == "" {
+		dbtBin = defaultDbtBin
+	}
 	acts := &orchestrator.Activities{
-		Sources:  sources,
-		Fetchers: map[string]source.Fetcher{beads.Declaration().Name: fetcher},
-		Writer:   &bronze.Writer{Root: filepath.Join(absRoot, "bronze")},
-		SpoolDir: filepath.Join(absRoot, "local", "spool"),
+		Sources:      orchestrator.Declarations(),
+		Fetchers:     map[string]source.Fetcher{beads.Declaration().Name: fetcher},
+		Writer:       &bronze.Writer{Root: filepath.Join(absRoot, "bronze")},
+		SpoolDir:     filepath.Join(absRoot, "local", "spool"),
+		DbtRunner:    dbt.Runner{Bin: dbtBin, WorkDir: absRoot},
+		TransformEnv: transform.Env{WarehouseRoot: filepath.Join(absRoot, "warehouse")},
 	}
 	w := worker.New(c, orchestrator.TaskQueue, workerOptions())
 	orchestrator.Register(w, acts)
 
-	fmt.Fprintf(stdout, "worker: polling task queue %q at %s (namespace %s), root %s\n",
-		orchestrator.TaskQueue, tcfg.Address, tcfg.Namespace, absRoot)
+	fmt.Fprintf(stdout, "worker: polling task queue %q at %s (namespace %s), root %s, dbt %s, telemetry %s\n",
+		orchestrator.TaskQueue, tcfg.Address, tcfg.Namespace, absRoot, dbtBin, telCfg.Exporter)
 	if err := w.Run(worker.InterruptCh()); err != nil {
 		fmt.Fprintln(stderr, "worker:", err)
 		return 1

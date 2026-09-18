@@ -1,6 +1,7 @@
-// Package orchestrator runs ingestion on Temporal: the Fetcher and the Writer become activities,
-// a workflow per window and a workflow per source decide what runs, and a Temporal Schedule
-// supplies the cadence that a ticker would otherwise provide.
+// Package orchestrator runs the platform on Temporal: the Fetcher and the Writer become activities,
+// a workflow per window and a workflow per source decide what runs, a workflow builds the marts
+// once ingestion has succeeded, and a Temporal Schedule supplies the cadence that a ticker would
+// otherwise provide.
 //
 // Data-engineering concept: durable, replayable orchestration (activities, workflows, schedules,
 // claim-check).
@@ -23,6 +24,21 @@
 // WriteWindow never deletes the spool, so every retry of it finds the file. DeleteSpool runs once
 // WriteWindow has finished: after it succeeds, and also after it has failed for good (retries
 // exhausted or a non-retryable error), because no later activity could redeem that spool.
+//
+// Two-pass mart build. Once every MaterialiseWindow child has succeeded, MaterialiseSource starts
+// one BuildMarts child for the day it started in (id build-marts/<source>/<day>); if any
+// ingestion child failed, the marts are not rebuilt over incomplete bronze. BuildMarts runs the
+// DbtBuild activity with tag:pre_go (staging views and the marts the Go transforms read), then
+// one RunTransform activity per catalog transform (each writes a derived bronze file through the
+// same Writer), then DbtBuild with tag:post_go (the marts built on the derived files). dbt's own
+// DAG orders the models inside each pass. A dbt failure is non-retryable and names the failed
+// nodes from run_results.json; any failed step stops the workflow before the next one.
+//
+// Telemetry. Every activity records its duration and outcome on platform.activity.duration.
+// WriteWindow and RunTransform add what they wrote to platform.rows_written and
+// platform.bytes_written, and DbtBuild turns run_results.json into one span per dbt node under
+// its own activity span. The workflow and activity spans themselves come from the Temporal
+// OpenTelemetry interceptor the worker installs.
 //
 // Schedule. ApplySchedule upserts one Temporal Schedule per source at the source's declared
 // cadence. It starts MaterialiseSource, skips a tick while the previous run is still going, and

@@ -197,6 +197,44 @@ func TestFetchThenWrite_BronzeExtractedAtMatchesFetchedAt_AC33(t *testing.T) {
 	}
 }
 
+// AC-39: "WriteWindow adds counters platform.rows_written and platform.bytes_written (attributes
+// source, table, zone)." This installs a real in-memory OTel MeterProvider as the process's global
+// provider (internal/telemetry.RecordWrite reads the global provider at call time -- see
+// activity_buildmarts_test.go's newBuildMartsMeterProvider doc comment) and drives WriteWindow for
+// real, so the metric read back is whatever WriteWindow itself actually recorded, not a mock
+// standing in for it.
+func TestWriteWindow_RecordsRowsAndBytesWrittenMetric_AC39(t *testing.T) {
+	batch := sampleBatch()
+	a, _, _, _ := newTestActivities(t, batch, nil, fixedNow)
+	w := mustWindow(t, 2026, 9, 15, 13, window.Hour)
+	in := orchestrator.FetchWindowInput{Source: "beads", Table: "dolt_history_issues", Window: w}
+
+	meterReader := newBuildMartsMeterProvider(t)
+
+	env := newTestActivityEnv(t, a)
+	ref := mustFetch(t, env, a, in)
+
+	writeVal, err := env.ExecuteActivity(a.WriteWindow, ref)
+	if err != nil {
+		t.Fatalf("WriteWindow: %v", err)
+	}
+	var result bronze.Result
+	if err := writeVal.Get(&result); err != nil {
+		t.Fatalf("decode bronze.Result: %v", err)
+	}
+
+	attrs := map[string]string{"source": "beads", "table": "dolt_history_issues", "zone": "raw"}
+	if got := sumInt64Point(t, meterReader, "platform.rows_written", attrs); got != int64(result.Rows) {
+		t.Errorf("platform.rows_written(beads,dolt_history_issues,raw) = %d, want %d (bronze.Result.Rows)", got, result.Rows)
+	}
+	if got := sumInt64Point(t, meterReader, "platform.bytes_written", attrs); got != result.Bytes {
+		t.Errorf("platform.bytes_written(beads,dolt_history_issues,raw) = %d, want %d (bronze.Result.Bytes)", got, result.Bytes)
+	}
+	if got := histogramCount(t, meterReader, "platform.activity.duration", map[string]string{"activity": "WriteWindow", "outcome": "success"}); got != 1 {
+		t.Errorf("platform.activity.duration(WriteWindow,success) Count = %d, want 1 (the brief: \"Every activity, the ingest ones included, calls telemetry.RecordActivity\")", got)
+	}
+}
+
 // AC-33: the spool file FetchWindow wrote survives WriteWindow (so a retried WriteWindow whose
 // earlier completion was lost still finds it), DeleteSpool then removes it, and a second
 // DeleteSpool on the now-missing file still succeeds -- "a missing file counts as success".

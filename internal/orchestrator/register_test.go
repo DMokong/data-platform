@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -45,16 +46,25 @@ func (r *recordingRegistry) RegisterActivityWithOptions(a interface{}, o activit
 	r.activities = append(r.activities, o.Name)
 }
 
+// AC-37 added BuildMarts, DbtBuild and RunTransform to what task 06 already registered; this test
+// checks each expected name is registered exactly once, under exactly that name, with nothing
+// extra and nothing missing -- registration *order* is not part of any AC (Temporal's registry
+// does not care what order names are added in), so the comparison sorts both sides instead of
+// pinning task 09's particular append order inside Register's body.
 func TestRegister_UsesExplicitNames(t *testing.T) {
 	var r recordingRegistry
 	orchestrator.Register(&r, &orchestrator.Activities{})
-	wantWF := []string{"MaterialiseSource", "MaterialiseWindow"}
-	wantAct := []string{"FetchWindow", "WriteWindow", "DeleteSpool"}
-	if !reflect.DeepEqual(r.workflows, wantWF) {
-		t.Errorf("workflows registered as %v, want %v", r.workflows, wantWF)
+	wantWF := []string{"BuildMarts", "MaterialiseSource", "MaterialiseWindow"}
+	wantAct := []string{"DbtBuild", "DeleteSpool", "FetchWindow", "RunTransform", "WriteWindow"}
+	gotWF := append([]string(nil), r.workflows...)
+	gotAct := append([]string(nil), r.activities...)
+	sort.Strings(gotWF)
+	sort.Strings(gotAct)
+	if !reflect.DeepEqual(gotWF, wantWF) {
+		t.Errorf("workflows registered as %v (sorted %v), want %v", r.workflows, gotWF, wantWF)
 	}
-	if !reflect.DeepEqual(r.activities, wantAct) {
-		t.Errorf("activities registered as %v, want %v", r.activities, wantAct)
+	if !reflect.DeepEqual(gotAct, wantAct) {
+		t.Errorf("activities registered as %v (sorted %v), want %v", r.activities, gotAct, wantAct)
 	}
 	if orchestrator.TaskQueue != "data-platform" {
 		t.Errorf("TaskQueue = %q, want %q", orchestrator.TaskQueue, "data-platform")
@@ -269,6 +279,12 @@ func TestMaterialiseSource_ReturnsPerTableTotals(t *testing.T) {
 			}
 			return res, nil
 		})
+	// AC-37: every ingestion child succeeds here, so MaterialiseSource also starts a BuildMarts
+	// child; this test's own concern is the per-table totals below, so BuildMarts is mocked to a
+	// bare success rather than asserted on (see workflow_materialise_test.go's dedicated AC-37
+	// tests for BuildMarts's id/input/ordering).
+	env.OnWorkflow(orchestrator.BuildMarts, mock.Anything, mock.Anything).
+		Return(orchestrator.BuildMartsResult{}, nil)
 	env.ExecuteWorkflow(orchestrator.MaterialiseSource, orchestrator.MaterialiseSourceInput{Source: "beads"})
 	if err := env.GetWorkflowError(); err != nil {
 		t.Fatalf("MaterialiseSource failed: %v", err)
