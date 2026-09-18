@@ -72,8 +72,13 @@ func Lookback(now time.Time, g Grain, n int) ([]Window, error) {
 
 // Range returns every window of Grain g with Start in [from's UTC calendar date 00:00Z, (to's
 // UTC calendar date + 1 day) 00:00Z). Only the UTC calendar date of from and to is used; the time
-// of day is ignored. It is an error for from's date to be after to's date.
+// of day is ignored. It is an error for from's date to be after to's date, or for g to be an
+// unknown Grain (Duration() == 0 would otherwise loop forever without advancing start).
 func Range(from, to time.Time, g Grain) ([]Window, error) {
+	d := g.Duration()
+	if d <= 0 {
+		return nil, fmt.Errorf("window: Range: unknown grain %d", int(g))
+	}
 	fromDate := from.UTC().Truncate(24 * time.Hour)
 	toDate := to.UTC().Truncate(24 * time.Hour)
 	if fromDate.After(toDate) {
@@ -81,7 +86,6 @@ func Range(from, to time.Time, g Grain) ([]Window, error) {
 			fromDate.Format("2006-01-02"), toDate.Format("2006-01-02"))
 	}
 	end := toDate.Add(24 * time.Hour)
-	d := g.Duration()
 	var windows []Window
 	for start := fromDate; start.Before(end); start = start.Add(d) {
 		windows = append(windows, Window{Start: start, End: start.Add(d), Grain: g})

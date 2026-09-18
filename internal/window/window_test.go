@@ -298,6 +298,30 @@ func TestRange_FromAfterTo_AC01(t *testing.T) {
 	}
 }
 
+// Regression (adversarial review, round 1): Range must error on an unknown Grain instead of
+// hanging. g.Duration() is 0 for any Grain other than Hour/Day, so the loop `start =
+// start.Add(d)` would never advance start past end and never return. Bounded by -timeout in CI as
+// a backstop; this test itself must return quickly once the guard is in place.
+func TestRange_UnknownGrain_ReturnsError(t *testing.T) {
+	from := utc(2026, 9, 14, 0, 0, 0)
+	to := utc(2026, 9, 15, 0, 0, 0)
+	done := make(chan struct{})
+	var got []window.Window
+	var err error
+	go func() {
+		got, err = window.Range(from, to, window.Grain(0))
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("Range with unknown Grain did not return within 3s (infinite loop suspected)")
+	}
+	if err == nil {
+		t.Errorf("Range(from, to, Grain(0)) returned nil error, windows=%v", got)
+	}
+}
+
 // AC-01: Window.Validate() accepts well-formed windows and rejects malformed ones.
 func TestWindowValidate_AC01(t *testing.T) {
 	sydney, sydErr := time.LoadLocation("Australia/Sydney")
