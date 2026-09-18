@@ -30,9 +30,10 @@ edit, comment at milestones, close in the same turn work finishes.
 
 ## Toolchain
 
-Go 1.25 is installed. `dbt-core` + `dbt-duckdb`, the DuckDB CLI and the Temporal CLI are not yet
-installed; install with Homebrew / pipx / uv (all free, no accounts). Record exact versions in the
-spec's decision log when you pin them.
+Go 1.25 is installed; dbt-core + dbt-duckdb, the DuckDB CLI and the Temporal CLI are also
+installed; pinned versions are in the spec's decision log. Install commands: DuckDB CLI and
+Temporal CLI via `brew install duckdb temporal`; dbt-core + dbt-duckdb via
+`uv tool install --python 3.12 dbt-core --with dbt-duckdb`.
 
 ## Source one: beads
 
