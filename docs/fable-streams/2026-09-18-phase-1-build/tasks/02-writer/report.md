@@ -1856,3 +1856,432 @@ Conductor rulings on the test-adversary outcome (timestamp 2026-09-18T15:32:46Z,
    round 2) references `forceSyncErr`, which `writer.go` does not declare. `go test ./internal/bronze/...`
    therefore fails to build (`writer_test.go:968:9: undefined: forceSyncErr`). This is settled fact for round 3:
    the next implementer round adds the seam exactly as the test expects and does not modify the tests.
+
+## implementer — round 3
+
+Fix round for the one blocker in the round-3 dispatch: the hardened suite did not build because
+`internal/bronze/writer_test.go` referenced `forceSyncErr`, which `writer.go` did not declare. I treated
+`## fable — round 3` and the brief's "Round 3 amendment" as settled.
+
+**Working directory and tracker.** Before any write, `cd /Users/dustincheng/projects/data-platform`, the
+toplevel check and the branch check printed `CWD-OK` (branch `phase-1`). I re-ran the check just before the
+commit. `bd update trk-bam.2 --claim --actor claudeclaw` returned `✓ Updated issue: trk-bam.2 — Phase 1 · T02
+bronze Writer: deterministic paths, byte-identical overwrite (TDD)`.
+
+**Commit: `c494ff81566038af768dea74a5e3ce81f90d30c6`** (`fix(bronze): add forceSyncErr seam and commit hardened
+writer tests`). It holds only the two in-scope files:
+```
+$ git show --stat --format='%H%n%s' HEAD
+c494ff81566038af768dea74a5e3ce81f90d30c6
+fix(bronze): add forceSyncErr seam and commit hardened writer tests
+
+ internal/bronze/writer.go      |  15 ++-
+ internal/bronze/writer_test.go | 264 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 277 insertions(+), 2 deletions(-)
+```
+I did not touch `internal/runner/**`, `cmd/ingest/**` or `tasks/04-runner/report.md`, which belong to task
+04-runner. `04-runner/report.md` is still modified in the working tree and was left out of the commit. This
+report is not committed.
+
+### Failure reproduced first (before any edit)
+
+`go test -count=1 ./internal/bronze/...` exited 1:
+```
+# github.com/DMokong/data-platform/internal/bronze [github.com/DMokong/data-platform/internal/bronze.test]
+internal/bronze/writer_test.go:968:9: undefined: forceSyncErr
+internal/bronze/writer_test.go:969:2: undefined: forceSyncErr
+internal/bronze/writer_test.go:970:21: undefined: forceSyncErr
+FAIL	github.com/DMokong/data-platform/internal/bronze [build failed]
+FAIL
+```
+
+### What changed
+
+- **`internal/bronze/writer.go`.** I added `var forceSyncErr error` right after `forceEncodeErr`, with a doc comment
+  in the same style. At the `tmp.Sync()` call site in `replaceFile`, a non-nil `forceSyncErr` is treated as the
+  sync error and **`Sync` is not called**. This is what the amendment requires. Nothing else on the failure path
+  changed. The same `return 0, syncErr` feeds the existing deferred cleanup, so the temp file is closed and
+  removed and the target is never renamed over. The whole diff:
+  ```
+  -	if err := tmp.Sync(); err != nil {
+  -		return 0, err
+  +	syncErr := forceSyncErr
+  +	if syncErr == nil {
+  +		syncErr = tmp.Sync()
+  +	}
+  +	if syncErr != nil {
+  +		return 0, syncErr
+  	}
+  ```
+  plus the 7-line declaration and comment. When the seam is nil (production), behaviour is exactly the same as
+  before. `TestWrite_GoldenBytes_AC04` and `TestWrite_LargeBatchGoldenBytes_AC04` still pass (see below), so the
+  bytes of a valid write are unchanged.
+- **`internal/bronze/writer_test.go`.** I made no edits. The amendment forbids them. I committed test-author round 2's
+  264-line hardening as it was: `git diff --stat` before the commit showed `264 +++…, 1 file changed, 264
+  insertions(+)`.
+- **Codec.** Unchanged, as the amendment requires. `grep -n 'zstd.Codec' internal/bronze/writer.go` →
+  `88:var codec = &zstd.Codec{Level: zstd.SpeedDefault, Concurrency: 1}`. The rationale is in `## implementer —
+  round 2`: pure Go, deterministic through `EncodeAll`, and level and concurrency pinned explicitly. Fable round 3
+  confirmed `Concurrency` is equivalent under `EncodeAll`.
+- **Timestamp logical types.** Unchanged since round 2. Provenance columns use
+  `TimestampAdjusted(Microsecond, true)`. The batch `Timestamp` uses `TimestampAdjusted(Microsecond, false)`, wrapped in
+  `naiveTimestampType` to drop parquet-go's contradictory `TIMESTAMP_MICROS` converted type, and its values are
+  written with `wallClockMicros`. The DESCRIBE output below confirms both types.
+
+**A note on the test file's comment, not a dispute.** The doc block above
+`TestWrite_SyncFailureLeavesPriorFileIntact_AC05` (`writer_test.go:918-944`) still says the hook is "not yet
+declared". Its example checks `forceSyncErr` *after* a real `tmp.Sync()`. I followed the brief's amendment
+instead ("do not call `Sync`"). The test passes either way, because it only asserts a non-nil error, the prior
+file byte-identical, and no temp or fresh file. I could not update the stale comment because the amendment
+forbids modifying `*_test.go`. If the conductor wants it corrected, that is test-author scope.
+
+**Seam sensitivity check (scratch only, nothing written in the checkout).** I deleted the whole sync block from a
+copy of `writer.go` in the session scratchpad and applied it with `go test -overlay`. The new test kills that
+mutant, which is breaker-2 v5 (missing sync). `git status --short` afterwards showed only the expected files.
+```
+$ go test -count=1 -overlay $S/overlay.json -run TestWrite_SyncFailureLeavesPriorFileIntact_AC05 ./internal/bronze/
+--- FAIL: TestWrite_SyncFailureLeavesPriorFileIntact_AC05 (0.00s)
+    writer_test.go:975: Write with forceSyncErr set returned a nil error, want the injected failure
+FAIL
+FAIL	github.com/DMokong/data-platform/internal/bronze	0.464s
+FAIL
+```
+
+### Verification (brief's commands, run after the edit; tails ≤30 lines)
+
+Done-check. **Exit 0.**
+```
+$ go test -count=1 ./internal/bronze/... && CGO_ENABLED=0 go build ./internal/bronze/... && ! go list -deps ./internal/bronze/... | grep -qi duckdb && echo DONE
+ok  	github.com/DMokong/data-platform/internal/bronze	0.548s
+DONE
+exit=0
+```
+1. gofmt. **Exit 0.**
+```
+$ test -z "$(gofmt -l internal/bronze)" && echo GOFMT-OK
+GOFMT-OK
+```
+2. vet. **Exit 0**, no output (`vet exit=0`).
+3. Verbose tests. **Exit 0** (the pipe status of `go test` is 0). Last 30 of the 40 tail lines:
+```
+=== RUN   TestPath_Errors_AC03/dataset_segment_is_'..'
+=== RUN   TestPath_Errors_AC03/dataset_is_only_'..'
+=== RUN   TestPath_Errors_AC03/dataset_segment_is_'.'
+=== RUN   TestPath_Errors_AC03/dataset_looks_absolute_(leading_slash,_empty_first_segment)
+=== RUN   TestPath_Errors_AC03/dataset_has_a_trailing_slash_(empty_last_segment)
+=== RUN   TestPath_Errors_AC03/dataset_has_a_doubled_slash_(empty_middle_segment)
+--- PASS: TestPath_Errors_AC03 (0.00s)
+    --- PASS: TestPath_Errors_AC03/window_fails_Validate:_misaligned_start (0.00s)
+    --- PASS: TestPath_Errors_AC03/window_fails_Validate:_unknown_grain (0.00s)
+    --- PASS: TestPath_Errors_AC03/window_fails_Validate:_non-UTC_location (0.00s)
+    --- PASS: TestPath_Errors_AC03/unknown_zone (0.00s)
+    --- PASS: TestPath_Errors_AC03/empty_zone (0.00s)
+    --- PASS: TestPath_Errors_AC03/empty_dataset (0.00s)
+    --- PASS: TestPath_Errors_AC03/dataset_segment_has_uppercase (0.00s)
+    --- PASS: TestPath_Errors_AC03/dataset_segment_has_a_hyphen (0.00s)
+    --- PASS: TestPath_Errors_AC03/dataset_segment_has_a_space (0.00s)
+    --- PASS: TestPath_Errors_AC03/dataset_segment_is_'..' (0.00s)
+    --- PASS: TestPath_Errors_AC03/dataset_is_only_'..' (0.00s)
+    --- PASS: TestPath_Errors_AC03/dataset_segment_is_'.' (0.00s)
+    --- PASS: TestPath_Errors_AC03/dataset_looks_absolute_(leading_slash,_empty_first_segment) (0.00s)
+    --- PASS: TestPath_Errors_AC03/dataset_has_a_trailing_slash_(empty_last_segment) (0.00s)
+    --- PASS: TestPath_Errors_AC03/dataset_has_a_doubled_slash_(empty_middle_segment) (0.00s)
+=== RUN   TestPath_NoEscapeSequenceInAcceptedPaths_AC03
+--- PASS: TestPath_NoEscapeSequenceInAcceptedPaths_AC03 (0.00s)
+PASS
+ok  	github.com/DMokong/data-platform/internal/bronze	0.350s
+```
+The tail above covers only path tests. The top-level results come from `go test -count=1 -v ./internal/bronze/... 2>&1 | grep -E
+'^(--- |ok|FAIL|PASS)'`: 20 pass and 1 skip. The skip is the sample test, because `BRONZE_SAMPLE_OUT` is unset. All five tests
+the amendment names pass:
+```
+--- PASS: TestWrite_DeterministicBytes_AC04 (0.02s)
+--- PASS: TestWrite_GoldenBytes_AC04 (0.01s)
+--- PASS: TestWrite_RejectsInvalidInputsWithoutWriting (0.00s)
+--- PASS: TestWrite_OverwriteIsAtomicNotAppend_AC05 (0.01s)
+--- PASS: TestWrite_EncodeFailureLeavesPriorFileIntact_AC05 (0.01s)
+--- PASS: TestWrite_ContextCancelledBeforeRename_AC05 (0.01s)
+--- PASS: TestWrite_ProvenanceColumns_AC06 (0.01s)
+--- PASS: TestWrite_RejectsProvenanceNamedColumn_AC06 (0.01s)
+--- PASS: TestWrite_TypeRoundTrip_AC07 (0.01s)
+--- PASS: TestWrite_ZeroRowBatchWritesFullSchema_AC07 (0.01s)
+--- PASS: TestWrite_LargeBatchGoldenBytes_AC04 (0.03s)
+--- PASS: TestWrite_RowOrderPreservedAboveSmallBatches_AC04 (0.00s)
+--- PASS: TestWrite_FalsyValuesRoundTripNotNull_AC07 (0.01s)
+--- PASS: TestWrite_TimestampTruncatesNotRounds_AC07 (0.01s)
+--- PASS: TestWrite_SyncFailureLeavesPriorFileIntact_AC05 (0.01s)
+--- SKIP: TestWriteSampleForInspection (0.00s)
+--- PASS: TestPath_ValidExamples_AC03 (0.00s)
+--- PASS: TestPath_DayBoundary_AC03 (0.00s)
+--- PASS: TestPath_Pure_AC03 (0.00s)
+--- PASS: TestPath_Errors_AC03 (0.00s)
+--- PASS: TestPath_NoEscapeSequenceInAcceptedPaths_AC03 (0.00s)
+PASS
+ok  	github.com/DMokong/data-platform/internal/bronze	0.393s
+```
+4. No-CGO build and no DuckDB in the dependencies. **Exit 0.**
+```
+NO-CGO-NO-DUCKDB
+exit=0
+```
+5. Sample file and DuckDB inspection. **Exit 0.** ANSI colour codes are stripped here. The DESCRIBE shows everything
+   the brief expects: `a_timestamp` is `timestamp`, the three provenance columns are `timestamp with time zone`,
+   `_source_file` is `varchar`, and the other kinds are varchar, bigint, double and boolean. The row is all NULL.
+   `dt` is DuckDB's hive partition column and is not in the file.
+```
+ok  	github.com/DMokong/data-platform/internal/bronze	0.214s
+local/tmp/bronze-sample/raw/sample/kinds/dt=2026-09-15/hh=13.parquet
+│ a_string      varchar                  │
+│ an_int64      bigint                   │
+│ a_float64     double                   │
+│ a_bool        boolean                  │
+│ a_timestamp   timestamp                │
+│ _extracted_at timestamp with time zone │
+│ _window_start timestamp with time zone │
+│ _window_end   timestamp with time zone │
+│ _source_file  varchar                  │
+│ dt            date                     │
+│ a_string │ an_int64 │ a_float64 │ a_bool  │ a_timestamp │      _extracted_at       │      _window_start       │       _window_end        │                 _source_file                 │     dt     │
+│ NULL     │     NULL │      NULL │ NULL    │ NULL        │ 2026-09-15 23:05:00+10   │ 2026-09-15 23:00:00+10   │ 2026-09-16 00:00:00+10   │ raw/sample/kinds/dt=2026-09-15/hh=13.parquet │ 2026-09-15 │
+exit=0
+```
+6. go and toolchain directives. **Exit 0.** The directive is `go 1.25` and there is no `toolchain` line.
+```
+go 1.25
+exit=0
+```
+7. parquet-go version and git state. **Exit 0.** Since round 2, `go.mod` has moved `parquet-go` into a require block
+   (line 7), because task 03 added its own dependencies. The version is still v0.32.0. The only modified tracked
+   path left is 04-runner's report, which belongs to that concurrent task.
+```
+7:	github.com/parquet-go/parquet-go v0.32.0
+15:	github.com/parquet-go/bitpack v1.0.0 // indirect
+16:	github.com/parquet-go/jsonlite v1.0.0 // indirect
+c494ff8 fix(bronze): add forceSyncErr seam and commit hardened writer tests
+a719254 docs(stream): adjudicate 02-writer test-adversary residue; amend brief for round 3
+26beb88 feat(runner): Runner and ingest CLI wiring Fetcher to Writer over windows
+ M docs/fable-streams/2026-09-18-phase-1-build/tasks/04-runner/report.md
+exit=0
+```
+
+**Side observation.** `.gitignore` no longer ignores `internal/bronze/`: `git check-ignore -v internal/bronze/writer.go`
+exits 1. So round 2's finding 3 appears to be fixed upstream, and `git add --` worked this round without `-f`.
+
+**Disputes:** none. **Escalation:** none.
+## verifier — round 3
+
+**Command 1: gofmt check**
+```
+cd /Users/dustincheng/projects/data-platform && test -z "$(gofmt -l internal/bronze)" && echo GOFMT-OK
+```
+Exit code: 0
+Output:
+```
+GOFMT-OK
+```
+
+**Command 2: go vet**
+```
+cd /Users/dustincheng/projects/data-platform && go vet ./internal/bronze/...
+```
+Exit code: 0
+Output: (no output)
+
+**Command 3: go test with -v**
+```
+cd /Users/dustincheng/projects/data-platform && go test -count=1 -v ./internal/bronze/... 2>&1 | tail -40
+```
+Exit code: 0
+Output (last 30 lines):
+```
+=== RUN   TestPath_DayBoundary_AC03
+--- PASS: TestPath_DayBoundary_AC03 (0.00s)
+=== RUN   TestPath_Pure_AC03
+--- PASS: TestPath_Pure_AC03 (0.00s)
+=== RUN   TestPath_Errors_AC03
+=== RUN   TestPath_Errors_AC03/window_fails_Validate:_misaligned_start
+=== RUN   TestPath_Errors_AC03/window_fails_Validate:_unknown_grain
+=== RUN   TestPath_Errors_AC03/window_fails_Validate:_non-UTC_location
+=== RUN   TestPath_Errors_AC03/unknown_zone
+=== RUN   TestPath_Errors_AC03/empty_zone
+=== RUN   TestPath_Errors_AC03/empty_dataset
+=== RUN   TestPath_Errors_AC03/dataset_segment_has_uppercase
+=== RUN   TestPath_Errors_AC03/dataset_segment_has_a_hyphen
+=== RUN   TestPath_Errors_AC03/dataset_segment_has_a_space
+=== RUN   TestPath_Errors_AC03/dataset_segment_is_'..'
+=== RUN   TestPath_Errors_AC03/dataset_is_only_'..'
+=== RUN   TestPath_Errors_AC03/dataset_segment_is_'.'
+=== RUN   TestPath_Errors_AC03/dataset_looks_absolute_(leading_slash,_empty_first_segment)
+=== RUN   TestPath_Errors_AC03/dataset_has_a_trailing_slash_(empty_last_segment)
+=== RUN   TestPath_Errors_AC03/dataset_has_a_doubled_slash_(empty_middle_segment)
+--- PASS: TestPath_Errors_AC03 (0.00s)
+    --- PASS: TestPath_Errors_AC03/window_fails_Validate:_misaligned_start (0.00s)
+    --- PASS: TestPath_Errors_AC03/window_fails_Validate:_unknown_grain (0.00s)
+    --- PASS: TestPath_Errors_AC03/window_fails_Validate:_non-UTC_location (0.00s)
+    --- PASS: TestPath_Errors_AC03/unknown_zone (0.00s)
+    --- PASS: TestPath_Errors_AC03/empty_zone (0.00s)
+    --- PASS: TestPath_Errors_AC03/empty_dataset (0.00s)
+    --- PASS: TestPath_Errors_AC03/dataset_segment_has_uppercase (0.00s)
+    --- PASS: TestPath_Errors_AC03/dataset_segment_has_a_hyphen (0.00s)
+    --- PASS: TestPath_Errors_AC03/dataset_segment_has_a_space (0.00s)
+    --- PASS: TestPath_Errors_AC03/dataset_segment_is_'..' (0.00s)
+    --- PASS: TestPath_Errors_AC03/dataset_is_only_'..' (0.00s)
+    --- PASS: TestPath_Errors_AC03/dataset_segment_is_'.' (0.00s)
+    --- PASS: TestPath_Errors_AC03/dataset_looks_absolute_(leading_slash,_empty_first_segment) (0.00s)
+    --- PASS: TestPath_Errors_AC03/dataset_has_a_trailing_slash_(empty_last_segment) (0.00s)
+    --- PASS: TestPath_Errors_AC03/dataset_has_a_doubled_slash_(empty_middle_segment) (0.00s)
+=== RUN   TestPath_NoEscapeSequenceInAcceptedPaths_AC03
+--- PASS: TestPath_NoEscapeSequenceInAcceptedPaths_AC03 (0.00s)
+PASS
+ok  	github.com/DMokong/data-platform/internal/bronze	0.299s
+```
+
+**Command 4: CGO_ENABLED=0 go build and no-duckdb check**
+```
+cd /Users/dustincheng/projects/data-platform && CGO_ENABLED=0 go build ./internal/bronze/... && ! go list -deps ./internal/bronze/... | grep -qi duckdb && echo NO-CGO-NO-DUCKDB
+```
+Exit code: 0
+Output:
+```
+NO-CGO-NO-DUCKDB
+```
+
+**Command 5: sample write test with duckdb verification**
+```
+cd /Users/dustincheng/projects/data-platform && rm -rf local/tmp/bronze-sample && BRONZE_SAMPLE_OUT=$PWD/local/tmp/bronze-sample go test -count=1 -run TestWriteSampleForInspection ./internal/bronze/ && f=$(find local/tmp/bronze-sample -name '*.parquet') && echo "$f" && duckdb -c "describe select * from read_parquet('$f')" && duckdb -c "select * from read_parquet('$f')"
+```
+Exit code: 0
+Output (last 30 lines):
+```
+ok  	github.com/DMokong/data-platform/internal/bronze	0.199s
+local/tmp/bronze-sample/raw/sample/kinds/dt=2026-09-15/hh=13.parquet
+┌────────────────────────────────────────┐
+│                Describe                │
+│                                        │
+│ a_string      varchar                  │
+│ an_int64      bigint                   │
+│ a_float64     double                   │
+│ a_bool        boolean                  │
+│ a_timestamp   timestamp                │
+│ _extracted_at timestamp with time zone │
+│ _window_start timestamp with time zone │
+│ _window_end   timestamp with time zone │
+│ _source_file  varchar                  │
+│ dt            date                     │
+│ a_string │ an_int64 │ a_float64 │ a_bool  │ a_timestamp │      _extracted_at       │      _window_start       │       _window_end        │                 _source_file                 │     dt     │
+│ varchar  │  int64   │  double   │ boolean │  timestamp  │ timestamp with time zone │ timestamp with time zone │ timestamp with time zone │                   varchar                    │    date    │
+├──────────┼──────────┼───────────┼─────────┼─────────────┼──────────────────────────┼──────────────────────────┼──────────────────────────┼──────────────────────────────────────────────┼────────────┤
+│ NULL     │     NULL │      NULL │ NULL    │ NULL        │ 2026-09-15 23:05:00+10   │ 2026-09-15 23:00:00+10   │ 2026-09-16 00:00:00+10   │ raw/sample/kinds/dt=2026-09-15/hh=13.parquet │ 2026-09-15 │
+└──────────┴──────────┴───────────┴─────────┴─────────────┴──────────────────────────┴──────────────────────────┴──────────────────────────┴──────────────────────────────────────────────┴────────────┘
+```
+
+**Command 6: go and toolchain directives**
+```
+cd /Users/dustincheng/projects/data-platform && grep -E '^(go|toolchain) ' go.mod
+```
+Exit code: 0
+Output:
+```
+go 1.25
+```
+
+**Command 7: parquet-go version and git info**
+```
+cd /Users/dustincheng/projects/data-platform && grep -n 'parquet-go' go.mod && git log --oneline -3 && git status --short
+```
+Exit code: 0
+Output:
+```
+7:	github.com/parquet-go/parquet-go v0.32.0
+15:	github.com/parquet-go/bitpack v1.0.0 // indirect
+16:	github.com/parquet-go/jsonlite v1.0.0 // indirect
+c494ff8 fix(bronze): add forceSyncErr seam and commit hardened writer tests
+a719254 docs(stream): adjudicate 02-writer test-adversary residue; amend brief for round 3
+26beb88 feat(runner): Runner and ingest CLI wiring Fetcher to Writer over windows
+ M docs/fable-streams/2026-09-18-phase-1-build/tasks/04-runner/report.md
+```
+
+**Summary.** All 7 verification commands passed. The implementation continues to meet all requirements with the hardened test suite from test-adversary round 2, including:
+- Proper gofmt formatting (GOFMT-OK)
+- Clean go vet analysis
+- All tests passing, including the new hardened tests (TestWrite_SyncFailureLeavesPriorFileIntact_AC05, TestWrite_LargeBatchGoldenBytes_AC04, TestWrite_RowOrderPreservedAboveSmallBatches_AC04, TestWrite_FalsyValuesRoundTripNotNull_AC07, TestWrite_TimestampTruncatesNotRounds_AC07)
+- CGO disabled build with no duckdb dependency (NO-CGO-NO-DUCKDB)
+- Sample output with correct schema verified by DuckDB
+- Go version 1.25 with parquet-go v0.32.0 dependency
+- forceSyncErr test seam added to writer.go per round 3 amendment
+
+
+## adversarial-reviewer — round 3
+
+**Result: pass, with no findings.** Commit `c494ff8` touches only `internal/bronze/writer.go` (+13/-2) and
+`internal/bronze/writer_test.go` (+264/-0), and both are in the File scope. It meets every point of the brief's Round 3 amendment. My own re-run of
+every command matches the verifier's round-3 record. I treated the `## fable — round 3` rulings as settled, so I did not reopen the zstd
+`Concurrency` residue or the seam requirement.
+
+**Done-check, re-run by me** from `/Users/dustincheng/projects/data-platform` on `phase-1` (`CWD-OK`). Exit 0:
+```
+ok  	github.com/DMokong/data-platform/internal/bronze	0.342s
+DONE
+exit=0
+GOFMT-OK
+VET-OK
+go 1.25
+88:var codec = &zstd.Codec{Level: zstd.SpeedDefault, Concurrency: 1}
+```
+- **Verbose run.** 21 top-level tests: 20 pass, and `TestWriteSampleForInspection` is skipped because `BRONZE_SAMPLE_OUT` is unset. All five tests the
+  amendment names pass (`SyncFailureLeavesPriorFileIntact_AC05`, `LargeBatchGoldenBytes_AC04`,
+  `RowOrderPreservedAboveSmallBatches_AC04`, `FalsyValuesRoundTripNotNull_AC07`, `TimestampTruncatesNotRounds_AC07`).
+  This matches the implementer's and verifier's lists.
+- **Global seams.** The seams are package-level variables, so I checked for test pollution and races. No test calls `t.Parallel`
+  (the grep exits 1). `-count=3 -shuffle=on` passes, and so does `-race`.
+- **Sample.** I wrote it into a scratch root rather than the checkout. With `TimeZone='UTC'`, DESCRIBE shows `a_timestamp timestamp`, the three
+  provenance columns as `timestamp with time zone`, `_source_file varchar`, and varchar/bigint/double/boolean for the other kinds.
+  The row reads `NULL ×5 | 13:05:00+00 | 13:00:00+00 | 14:00:00+00 | raw/sample/kinds/dt=2026-09-15/hh=13.parquet`.
+
+**Walking the amendment point by point.**
+- **`var forceSyncErr error` beside the encode seam.** It is at `writer.go:62-67`, directly after `forceEncodeErr`.
+- **When the seam is set, it is the sync error and `Sync` is not called.** `writer.go:162-168` does this: `syncErr := forceSyncErr; if
+  syncErr == nil { syncErr = tmp.Sync() }; if syncErr != nil { return 0, syncErr }`.
+- **The failure path is otherwise unchanged.** The early return goes into the existing `renamed == false` defer (`writer.go:148-153`), which closes and removes
+  the temp file. Rename is never reached. When the seam is nil, production behaviour is identical, and both golden-hash tests still pass.
+- **The codec is unchanged.** It is still `writer.go:88`.
+- **No `*_test.go` was modified.** The commit's test diff is +264/-0, which is exactly test-author round 2's "264 insertions, 0 deletions".
+  Independently, the committed file's line numbers match those cited by test-breaker round 3, which ran against a verbatim copy of
+  the test-author's file. Lines 782, 826, 865, 870, 912, 968-970 and 975 all hold the same assertion or seam text. `path_test.go` is untouched.
+- **`writer.go` and `writer_test.go` are committed together.** Both are in `c494ff8`, with the `Stream-task: ... round 3` and Co-Authored-By trailers. `report.md`
+  is not in the commit.
+- **Tracker.** `bd comments trk-bam.2` shows the 15:35 "round 3 (implementer)" comment, which cites `c494ff8`.
+
+**Attacking the seam.** I ran five mutants of the sync block through `go test -overlay`, from the session scratchpad. `git status` stayed clean apart from this report.
+
+| Mutant | Result |
+|---|---|
+| m1: whole sync block deleted (breaker-2 v5) | killed, `writer_test.go:975` nil error |
+| m3: sync error computed but ignored | killed, `writer_test.go:975` |
+| m4: temp cleanup skipped on sync error | killed, `writer_test.go:982/989` leftover `.tmp-*` |
+| m5: rename over target, then return the sync error | killed, `writer_test.go:980` target hash changed, `:989` fresh window left a file |
+| m2: seam check kept, real `tmp.Sync()` call removed | **survives** (`ok ... 0.476s`) |
+
+m2 is not a finding against this task. Any seam-based sync test has this limit, and the test-author's suggested alternative (check the seam *after* a real
+`Sync`) has it too: deleting only the `Sync` line there also passes. The brief's amendment chose the "do not call Sync" shape on purpose.
+What the seam proves is the one thing the brief asks of it: when the sync step fails, the failure is handled with AC-05's guarantees. I
+am recording m2 so the conductor knows about it. Nothing needs to change.
+
+**Steelman.** The change is the smallest edit that satisfies the amendment. It follows `forceEncodeErr`'s existing pattern and reuses the one
+deferred cleanup instead of adding a second cleanup path. The implementer also disclosed the stale test comment rather than quietly editing a
+forbidden file.
+
+**A note for the conductor, not a finding against this task.** `writer_test.go:918-944` still says the hook is "not yet declared", that the identifier is
+undefined and the build fails (`:941`), and it shows the check placed *after* a real `tmp.Sync()` (`:931-938`). The amendment chose the opposite
+shape. `writer_test.go:15` has the same kind of stale "does not exist yet" wording for `forceEncodeErr`, left over since round 1. The amendment forbids
+the implementer from editing `*_test.go`, so a comment refresh belongs to the test-author or the conductor. It does not affect correctness.
+
+**Carried forward.** The `.gitignore` issue (round-1 finding 3) appears resolved upstream: `git check-ignore -v internal/bronze/writer.go` exits 1.
+
+```json
+{
+  "verdict": "pass",
+  "findings": [],
+  "escalation": null
+}
+```
