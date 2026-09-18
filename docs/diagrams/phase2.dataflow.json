@@ -1,0 +1,317 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Phase 2 Data Flow",
+    "output": "docs/data-platform/diagrams/phase2.dataflow.html",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1080,
+      540
+    ],
+    "views": [
+      {
+        "id": "hot-path",
+        "label": "Ingest to marts",
+        "focus": [
+          "beads",
+          "ingest",
+          "raw",
+          "staging",
+          "marts",
+          "catalog"
+        ],
+        "note": "Same path as phase 1 until marts, which now commit through the DuckLake catalog."
+      },
+      {
+        "id": "serving",
+        "label": "Serving layer",
+        "focus": [
+          "marts",
+          "serving",
+          "bi",
+          "gotx"
+        ],
+        "note": "Every reader, human or Go, goes through PgBouncer and pg_duckdb over Postgres wire."
+      },
+      {
+        "id": "go-loop",
+        "label": "Go transform loop",
+        "focus": [
+          "serving",
+          "gotx",
+          "derived",
+          "marts"
+        ],
+        "note": "Go reads marts over Postgres wire and writes derived Parquet to S3; dbt reads it back."
+      }
+    ]
+  },
+  "stages": [
+    {
+      "label": "Sources"
+    },
+    {
+      "label": "Go ingestion"
+    },
+    {
+      "label": "Bronze (S3)"
+    },
+    {
+      "label": "Lakehouse (dbt + DuckLake)"
+    },
+    {
+      "label": "Serving"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "beads",
+      "type": "external",
+      "label": "Beads tracker",
+      "sublabel": "Dolt · MySQL wire",
+      "stage": 0,
+      "row": 0,
+      "tag": "history"
+    },
+    {
+      "id": "ingest",
+      "type": "backend",
+      "label": "Fetcher → Writer",
+      "sublabel": "Temporal workers",
+      "stage": 1,
+      "row": 1,
+      "width": 150,
+      "tag": "Go",
+      "brand": "go"
+    },
+    {
+      "id": "raw",
+      "type": "database",
+      "label": "bronze/raw",
+      "sublabel": "S3, dt=/hh=",
+      "stage": 2,
+      "row": 0,
+      "tag": "immutable"
+    },
+    {
+      "id": "derived",
+      "type": "database",
+      "label": "bronze/derived",
+      "sublabel": "from Go transforms",
+      "stage": 2,
+      "row": 2,
+      "tag": "derived"
+    },
+    {
+      "id": "staging",
+      "type": "database",
+      "label": "staging views",
+      "sublabel": "casts, renames",
+      "stage": 3,
+      "row": 0,
+      "tag": "external tables"
+    },
+    {
+      "id": "marts",
+      "type": "database",
+      "label": "marts (DuckLake)",
+      "sublabel": "Parquet on S3",
+      "stage": 3,
+      "row": 1,
+      "tag": "tested"
+    },
+    {
+      "id": "catalog",
+      "type": "database",
+      "label": "DuckLake catalog",
+      "sublabel": "RDS Postgres",
+      "stage": 3,
+      "row": 2,
+      "tag": "ACID",
+      "brand": "postgresql",
+      "width": 150
+    },
+    {
+      "id": "bi",
+      "type": "frontend",
+      "label": "BI tools",
+      "sublabel": "Metabase / Superset",
+      "stage": 4,
+      "row": 0,
+      "tag": "concurrent"
+    },
+    {
+      "id": "serving",
+      "type": "security",
+      "label": "pg_duckdb",
+      "sublabel": "via PgBouncer",
+      "stage": 4,
+      "row": 1,
+      "tag": "Postgres wire",
+      "brand": "postgresql"
+    },
+    {
+      "id": "gotx",
+      "type": "backend",
+      "label": "Go transforms",
+      "sublabel": "row logic · text",
+      "stage": 4,
+      "row": 2,
+      "tag": "Go",
+      "brand": "go"
+    }
+  ],
+  "flows": [
+    {
+      "id": "beads-history",
+      "from": "beads",
+      "to": "ingest",
+      "label": "events, snapshots, row history",
+      "classification": "per window",
+      "variant": "emphasis"
+    },
+    {
+      "id": "parquet-write",
+      "from": "ingest",
+      "to": "raw",
+      "label": "Parquet per window",
+      "classification": "IRSA, overwrite",
+      "variant": "emphasis"
+    },
+    {
+      "id": "read-in-place",
+      "from": "raw",
+      "to": "staging",
+      "label": "read in place",
+      "classification": "no load step",
+      "variant": "emphasis"
+    },
+    {
+      "id": "build-marts",
+      "from": "staging",
+      "to": "marts",
+      "label": "dbt build",
+      "classification": "joins, aggregates, tests",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelAt": [
+        745,
+        214
+      ]
+    },
+    {
+      "id": "commit",
+      "from": "marts",
+      "to": "catalog",
+      "label": "DuckLake commit",
+      "classification": "snapshot + file list",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelAt": [
+        745,
+        328
+      ]
+    },
+    {
+      "id": "snapshots",
+      "from": "marts",
+      "to": "serving",
+      "label": "snapshots",
+      "classification": "via catalog",
+      "variant": "emphasis",
+      "labelAt": [
+        853,
+        314
+      ]
+    },
+    {
+      "id": "bi-read",
+      "from": "serving",
+      "to": "bi",
+      "label": "SQL",
+      "classification": "roles, RLS, audit",
+      "variant": "default",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "route": "straight",
+      "labelAt": [
+        960,
+        214
+      ]
+    },
+    {
+      "id": "go-read",
+      "from": "serving",
+      "to": "gotx",
+      "label": "pgx",
+      "classification": "pooled",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelAt": [
+        960,
+        328
+      ]
+    },
+    {
+      "id": "go-output",
+      "from": "gotx",
+      "to": "derived",
+      "label": "Parquet via Writer",
+      "classification": "to S3",
+      "variant": "dashed",
+      "route": "bottom-channel"
+    },
+    {
+      "id": "derived-source",
+      "from": "derived",
+      "to": "marts",
+      "label": "declared dbt source",
+      "classification": "freshness tested",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "left",
+      "via": [
+        [
+          530,
+          271
+        ]
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Unchanged from phase 1",
+      "items": [
+        "Same Fetcher, Writer, window rules and bronze paths; only the medium moved from disk to S3",
+        "Raw is still read in place as external tables; nothing is loaded",
+        "Staging and marts are the same dbt models, repointed at a DuckLake target"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "New in phase 2",
+      "items": [
+        "Every mart build commits through the DuckLake catalog on RDS, so concurrent dbt pods are safe",
+        "A Postgres-wire serving layer (PgBouncer + pg_duckdb) sits between marts and every reader",
+        "Auth, row-level security and audit come from Postgres roles at that layer"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Go transforms in phase 2",
+      "items": [
+        "Go reads marts over Postgres wire with pgx, not from S3 directly, so the catalog stays the single view of truth",
+        "Output is still Parquet to bronze/derived through the same Writer",
+        "dbt declares derived as a source, exactly as in phase 1"
+      ]
+    }
+  ]
+}

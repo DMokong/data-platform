@@ -1,0 +1,20 @@
+# local state
+.beads/
+local/
+*.duckdb
+*.duckdb.wal
+bronze/
+warehouse/
+logs/
+.env
+.env.*
+!.env.example
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+# go
+bin/
+# archify browser evidence
+docs/diagrams/*.visual-check.*.png
+docs/diagrams/*.visual-check.html

@@ -1,0 +1,328 @@
+<title>DuckDB at Scale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #F4F6F8; --surface: #FFFFFF; --surface-2: #EAEEF2;
+    --ink: #16202A; --ink-2: #4E5D6B; --ink-3: #7C8994; --rule: #D5DCE3;
+    --accent: #1F5FA8; --accent-ink: #FFFFFF; --accent-soft: #E3ECF8;
+    --crit: #B3261E;  --crit-soft: #F8E4E2;
+    --warn: #9A5B00;  --warn-soft: #F8EBD6;
+    --good: #24704A;  --good-soft: #DFF0E5;
+    --note: #3C5A78;  --note-soft: #E4ECF4;
+    --code-bg: #EEF1F4;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0F151B; --surface: #161E26; --surface-2: #1E2832;
+      --ink: #E6ECF1; --ink-2: #A9B6C1; --ink-3: #7A8894; --rule: #2A3540;
+      --accent: #6FA5E8; --accent-ink: #0F151B; --accent-soft: #1B2B40;
+      --crit: #F08B84; --crit-soft: #3A1E1C; --warn: #E5B36A; --warn-soft: #3A2C16;
+      --good: #7CCB9B; --good-soft: #17301F; --note: #9BB8D6; --note-soft: #1B2837;
+      --code-bg: #1C2630; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F151B; --surface: #161E26; --surface-2: #1E2832;
+    --ink: #E6ECF1; --ink-2: #A9B6C1; --ink-3: #7A8894; --rule: #2A3540;
+    --accent: #6FA5E8; --accent-ink: #0F151B; --accent-soft: #1B2B40;
+    --crit: #F08B84; --crit-soft: #3A1E1C; --warn: #E5B36A; --warn-soft: #3A2C16;
+    --good: #7CCB9B; --good-soft: #17301F; --note: #9BB8D6; --note-soft: #1B2837;
+    --code-bg: #1C2630; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Source Sans 3", "Helvetica Neue", Arial, sans-serif; font-size: 17px; line-height: 1.55; padding-block: 0 64px; padding-inline: clamp(16px, 4vw, 40px); }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .measure { max-width: 72ch; }
+  h1, h2, h3 { font-family: "Bricolage Grotesque", "Source Sans 3", sans-serif; text-wrap: balance; margin: 0; line-height: 1.15; }
+  h1 { font-size: clamp(30px, 4vw, 44px); font-weight: 700; letter-spacing: -0.01em; }
+  h2 { font-size: 26px; font-weight: 700; margin-top: 64px; margin-bottom: 8px; }
+  h3 { font-size: 19px; font-weight: 700; margin-top: 28px; margin-bottom: 6px; }
+  p { margin: 0 0 14px; }
+  code, .mono { font-family: "JetBrains Mono", ui-monospace, Menlo, monospace; font-size: 0.86em; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+  pre { background: var(--code-bg); padding: 14px 16px; border-radius: 4px; overflow-x: auto; font-size: 14px; line-height: 1.5; }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  .eyebrow { font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+  .lede { font-size: 20px; color: var(--ink-2); max-width: 66ch; margin-top: 14px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 22px; color: var(--ink-3); font-size: 14px; margin-top: 18px; }
+  header { padding-block: 56px 8px; border-bottom: 1px solid var(--rule); }
+  .verdict { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1px; background: var(--rule); margin-top: 32px; border: 1px solid var(--rule); }
+  .verdict > div { background: var(--surface); padding: 16px 18px; }
+  .verdict .k { font-size: 12.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+  .verdict .v { font-family: "Bricolage Grotesque", sans-serif; font-size: 22px; font-weight: 700; margin-top: 4px; line-height: 1.2; }
+  .verdict .s { color: var(--ink-2); font-size: 14.5px; margin-top: 4px; }
+  .chip { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 8px; border-radius: 3px; vertical-align: middle; white-space: nowrap; }
+  .chip.crit { background: var(--crit-soft); color: var(--crit); }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); }
+  .chip.good { background: var(--good-soft); color: var(--good); }
+  .chip.note { background: var(--note-soft); color: var(--note); }
+  .tablewrap { overflow-x: auto; margin: 18px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; min-width: 640px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-size: 12.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; background: var(--surface-2); }
+  td:first-child { font-weight: 600; }
+  td.rec { background: var(--accent-soft); }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  ul.plain { padding-left: 20px; margin: 0 0 14px; }
+  ul.plain li { margin-bottom: 7px; }
+  ul.plain li b { font-weight: 600; }
+  .gap { display: grid; grid-template-columns: 150px 1fr; gap: 6px 20px; padding: 18px 0; border-top: 1px solid var(--rule); }
+  .gap:last-child { border-bottom: 1px solid var(--rule); }
+  .gap h3 { margin-top: 0; }
+  .gap p:last-child { margin-bottom: 0; }
+  .gap .fix { color: var(--ink-2); }
+  .gap .fix b { color: var(--ink); }
+  @media (max-width: 600px) { .gap { grid-template-columns: 1fr; } }
+  .diagram { background: var(--surface); border: 1px solid var(--rule); padding: 18px; overflow-x: auto; margin-top: 18px; }
+  .diagram pre.mermaid { background: none; padding: 0; overflow: visible; }
+  .callout { background: var(--accent-soft); border-left: 3px solid var(--accent); padding: 12px 16px; margin: 18px 0; }
+  .callout p:last-child { margin-bottom: 0; }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-top: 12px; }
+  .two h3 { margin-top: 8px; }
+  ol.seq { list-style: none; padding: 0; margin: 20px 0 0; counter-reset: step; }
+  ol.seq li { counter-increment: step; display: grid; grid-template-columns: 56px 1fr; gap: 0 16px; padding: 14px 0; border-top: 1px solid var(--rule); }
+  ol.seq li::before { content: counter(step, decimal-leading-zero); font-family: "JetBrains Mono", monospace; font-size: 15px; color: var(--accent); font-weight: 500; padding-top: 3px; }
+  ol.seq .t { font-weight: 600; }
+  ol.seq .d { color: var(--ink-2); font-size: 15px; margin-top: 2px; }
+  a { color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Viability analysis · data platform phase 2</div>
+  <h1 style="margin-top:10px">DuckDB at Scale</h1>
+  <p class="lede">Can a self-hosted DuckDB stack carry the platform for the foreseeable future, including at enterprise scale? Yes, with one reframing: DuckDB is the execution engine, not the warehouse. The warehouse is the table format, the catalog and the serving layer you put around it. Get those three right and the answer holds well past where most teams actually are. Get them wrong and you have a fast library with no front door.</p>
+  <div class="meta">
+    <span>Written 2026-09-16</span>
+    <span>Context: Redshift approved, Athena not available, no new subscriptions</span>
+    <span>Companion to <span class="mono">data-platform-spec.md</span> §4</span>
+  </div>
+
+  <div class="verdict">
+    <div><div class="k">Verdict</div><div class="v">Viable as primary path</div><div class="s">For a small-to-mid data team: single-digit terabytes hot, tens of concurrent BI users, batch plus interactive.</div></div>
+    <div><div class="k">Condition</div><div class="v">Lakehouse, not a file</div><div class="s">Object storage + DuckLake or Iceberg + Postgres-wire serving layer. Never a shared <span class="mono">.duckdb</span> file.</div></div>
+    <div><div class="k">Escape hatch</div><div class="v">Redshift, on triggers</div><div class="s">Named thresholds below. The spec's contract makes the switch a dbt profile change.</div></div>
+    <div><div class="k">Biggest risk</div><div class="v">Youth, not capability</div><div class="s">DuckLake and pg_duckdb are 2025 projects. Check versions, pin them, keep Parquet as the ground truth.</div></div>
+  </div>
+</header>
+
+<section class="measure">
+  <h2>The reframing</h2>
+  <p>"Self-hosting DuckDB" is a slight category error. DuckDB is an in-process library, like SQLite. There is no server to host, no daemon, no port. So the real question is: which architecture do you build around the library? There are four, and only two of them scale.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Architecture</th><th>Shape</th><th>Scales to</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td>One big box</td><td>A single large machine, one DuckDB process, one database file.</td><td>Terabytes of data, one writer, a handful of readers. DuckDB processes out-of-core, spilling to NVMe.</td><td><span class="chip warn">Batch only</span> Fine for the pipeline, no answer for concurrent users or HA.</td></tr>
+        <tr><td>Shared database file</td><td>Many processes opening the same <code>.duckdb</code> on shared storage.</td><td>Nowhere. One writer or many readers, never both; network filesystems are unsupported for writes.</td><td><span class="chip crit">Do not build</span> This is the failure mode people mean when they say DuckDB "doesn't scale".</td></tr>
+        <tr><td class="rec">Lakehouse: many DuckDBs, one catalog</td><td class="rec">Every job and every reader runs its own DuckDB. Shared state is Parquet on S3 plus a transactional catalog (DuckLake on Postgres, or Iceberg via a REST catalog). Concurrency is the catalog's job.</td><td class="rec">Compute scales horizontally by adding processes; storage is S3. Writers coordinate through catalog transactions.</td><td class="rec"><span class="chip good">The path</span> This is the architecture MotherDuck sells and the one your spec already describes in principles 2 and 4.</td></tr>
+        <tr><td>Server front end</td><td>Postgres with the <code>pg_duckdb</code> extension (or Snowflake's open-source <code>pg_lake</code>) executing analytical SQL via DuckDB over the lakehouse.</td><td>Adds what a library lacks: connections, auth, roles, a wire protocol every BI tool speaks.</td><td><span class="chip good">Pairs with the lakehouse</span> Not a replacement for it. This is the front door for humans and dashboards.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Truly distributed DuckDB, where one query fans out across machines, exists only at the edges: MotherDuck (a paid service, ruled out by principle 5) and DeepSeek's Smallpond (partition-parallel DuckDB over Ray and their 3FS filesystem, released 2025). Neither is needed if a single node can execute any one query and the catalog handles the rest, which is the bet the lakehouse architecture makes.</p>
+</section>
+
+<section class="measure">
+  <h2>Where the single-node bet holds</h2>
+  <p>The bet is that no individual query needs more than one large machine. Three pieces of evidence say that is true for most organisations most of the time.</p>
+  <ul class="plain">
+    <li><b>Data volumes are smaller than the industry narrative.</b> The MotherDuck founders' 2023 analysis of warehouse customer data argued that most organisations hold well under a terabyte of analytical data and most queries touch a small fraction of it. Cloud warehouses were built for the long tail of giants; the median customer is not one.</li>
+    <li><b>DuckDB executes out of core.</b> Since the 1.x series, joins, aggregations and sorts spill to disk when they exceed <code>memory_limit</code>. Published runs of the TPC-H benchmark at the 100 GB scale factor complete on a laptop; the 1 TB scale factor completes on a single large cloud instance. The ceiling is NVMe throughput on the box, not RAM.</li>
+    <li><b>Vertical scale is cheap now.</b> A single EKS node with 64 cores, 512 GB of RAM and local NVMe is an ordinary instance type. Two of them, stateless, behind Temporal, is more compute than a small team's marts will use.</li>
+  </ul>
+  <p>DuckDB is also no longer a research project. Version 1.0 landed in June 2024; 1.4 in September 2025 was the first long-term-support release with a year of patches, database encryption at rest, <code>MERGE INTO</code>, and Iceberg writes. It is embedded in shipping products from Fivetran, Hugging Face and Rill among others. The engine is not the risk.</p>
+</section>
+
+<section>
+  <h2>Where it genuinely falls short, and what closes each gap</h2>
+  <p class="measure">These are the things Redshift gives you on day one that a library cannot. Each one has a self-hosted answer, but every answer is a component you now run.</p>
+
+  <div class="gap">
+    <div><span class="chip crit">Hard gap</span></div>
+    <div>
+      <h3>No authentication, roles, row-level security or audit log</h3>
+      <p>A library has no users. Anyone who can open the file or read the bucket can read everything. Enterprise means someone will ask for column masking and a query log by user within a year.</p>
+      <p class="fix"><b>Closed by:</b> the Postgres front end. <code>pg_duckdb</code> puts Postgres roles, <code>GRANT</code>, row-level security policies and <code>pgaudit</code> in front of DuckDB execution. Bucket access uses IAM roles for service accounts on EKS, so workers never hold long-lived keys. This is the single most important reason the serving layer is Postgres and not a custom Go API.</p>
+    </div>
+  </div>
+
+  <div class="gap">
+    <div><span class="chip crit">Hard gap</span></div>
+    <div>
+      <h3>Multi-writer to one table</h3>
+      <p>Two Temporal workers cannot both write into one <code>.duckdb</code> file. Your spec sidesteps this for bronze by giving each worker its own partition files, but marts built by dbt are a single target.</p>
+      <p class="fix"><b>Closed by:</b> the table format. DuckLake stores table metadata in Postgres and data as Parquet; concurrent DuckDB clients commit through Postgres transactions, giving ACID multi-table writes, snapshots and time travel. Iceberg does the same through a REST catalog. Either way, "the warehouse" becomes a catalog database plus a bucket, and any number of dbt-duckdb processes can build different marts concurrently.</p>
+    </div>
+  </div>
+
+  <div class="gap">
+    <div><span class="chip warn">Soft gap</span></div>
+    <div>
+      <h3>Concurrent interactive users</h3>
+      <p>Each DuckDB process is independent. Fifty analysts each firing dashboard queries is fifty engines each with its own memory budget, and nothing arbitrates between them. Redshift has workload management and concurrency scaling; DuckDB has neither.</p>
+      <p class="fix"><b>Closed by:</b> the serving layer plus discipline. Postgres connection pooling (PgBouncer) caps concurrency; per-role <code>memory_limit</code> and <code>threads</code> settings bound each session; marts are pre-aggregated so dashboard queries are small. This is the dimension to load-test before committing, because it is the one that fails gradually rather than loudly.</p>
+    </div>
+  </div>
+
+  <div class="gap">
+    <div><span class="chip warn">Soft gap</span></div>
+    <div>
+      <h3>High availability</h3>
+      <p>There is no DuckDB failover because there is no DuckDB server. Put differently, HA is not the engine's problem.</p>
+      <p class="fix"><b>Closed by:</b> statelessness. Workers hold nothing durable; kill one and Temporal reschedules the activity. The only stateful component is the Postgres catalog, which gets Multi-AZ RDS or a Postgres operator with replicas. This is the same HA story as any lakehouse, and it is simpler than a Redshift cluster's.</p>
+    </div>
+  </div>
+
+  <div class="gap">
+    <div><span class="chip warn">Soft gap</span></div>
+    <div>
+      <h3>BI tool ecosystem</h3>
+      <p>Redshift is a first-class connector in every BI tool. DuckDB's Metabase driver is a community plugin; Grafana's DuckDB plugin comes from MotherDuck; Tableau and Power BI go through DuckDB's JDBC and ODBC drivers.</p>
+      <p class="fix"><b>Closed by:</b> Postgres wire. Every BI tool ever made speaks Postgres. Metabase, Grafana, Superset, Tableau and Power BI connect to <code>pg_duckdb</code> as a Postgres database and never know DuckDB is underneath. This also answers your visualiser question directly: concurrent reads go through Postgres, and never touch a file a writer holds.</p>
+    </div>
+  </div>
+
+  <div class="gap">
+    <div><span class="chip note">Organisational</span></div>
+    <div>
+      <h3>Support, hiring and the "who do we call" question</h3>
+      <p>Redshift comes with an AWS support contract and a large hiring pool. DuckDB Labs offers paid support; MotherDuck is the commercial path and is a subscription. A team inheriting this stack needs to understand a catalog, a table format and a Postgres extension, not one product.</p>
+      <p class="fix"><b>Mitigated by:</b> the ground truth being Parquet on S3. Whatever happens to DuckLake or pg_duckdb, Redshift Spectrum, Athena, Trino and Spark all read the data as it sits. The exit cost is a dbt profile change and a catalog re-registration, which is the lowest lock-in of any warehouse choice available to you.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Reference architecture for phase 2, self-hosted on EKS</h2>
+  <p class="measure">This is the spec's phase 2 with the warehouse box opened up. Every compute component is a disposable pod. The two stateful things are S3 and one Postgres.</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+    subgraph S3["S3 (the only durable data)"]
+        B["bronze/raw + bronze/derived<br/>Parquet, Hive partitions, written by Go"]
+        L["ducklake data/<br/>Parquet written by dbt-duckdb through DuckLake"]
+    end
+
+    subgraph PG["Postgres (RDS Multi-AZ or operator) — the only stateful service"]
+        CAT["DuckLake catalog schema<br/>tables, snapshots, file lists, transactions"]
+        SRV["pg_duckdb extension<br/>roles, GRANT, RLS, pgaudit<br/>executes analytical SQL via embedded DuckDB"]
+    end
+
+    subgraph EKS["EKS — stateless compute"]
+        TW["Temporal workers (Go)<br/>Fetcher + Writer activities → bronze"]
+        DB["dbt-duckdb pods (one per BuildMarts run)<br/>ATTACH ducklake:postgres://… ; build staging + marts<br/>read bronze in place, write marts as DuckLake tables"]
+        GT["Go transform pods<br/>read marts via Postgres wire (pgx), write bronze/derived"]
+        TS["Temporal server (Helm)"]
+        BI["Metabase / Grafana / Superset pods<br/>connect to Postgres like any Postgres"]
+        PB["PgBouncer<br/>connection cap per role"]
+    end
+
+    TS -.->|schedules| TW
+    TS -.->|schedules| DB
+    TS -.->|schedules| GT
+    TW --> B
+    B -->|read in place| DB
+    DB <-->|catalog transactions| CAT
+    DB --> L
+    GT --> B
+    SRV <-->|reads snapshots| CAT
+    L -->|read in place| SRV
+    B -->|read in place| SRV
+    BI --> PB --> SRV
+    GT -->|pgx| PB
+</pre>
+  </div>
+
+  <div class="two">
+    <div>
+      <h3>How concurrency actually works here</h3>
+      <ul class="plain">
+        <li><b>Writers:</b> each dbt-duckdb pod attaches DuckLake with its own DuckDB. Commits go through Postgres transactions, so two pods building different marts do not conflict, and two building the same mart serialise cleanly.</li>
+        <li><b>Readers:</b> BI tools query Postgres. <code>pg_duckdb</code> reads the current DuckLake snapshot and the Parquet behind it. No reader ever opens a file a writer has open, because there is no shared <code>.duckdb</code> file anywhere in the design.</li>
+        <li><b>Go:</b> reads marts over the Postgres wire with <code>pgx</code>, so the Go binary stays CGO-free, exactly as the spec's principle 6 wants.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>What you run that Redshift would run for you</h3>
+      <ul class="plain">
+        <li>One Postgres (RDS is fine and approved). Backups, minor upgrades, a Multi-AZ toggle.</li>
+        <li>The <code>pg_duckdb</code> extension version, pinned, tested on upgrade. RDS does not ship it, so this is a Postgres pod with the extension, or a self-managed instance. That is the operational cost of the front door.</li>
+        <li>DuckDB and DuckLake extension versions in the dbt image, pinned together.</li>
+        <li>Node sizing for the dbt pods: memory and NVMe for spill.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout measure">
+    <p><b>Why DuckLake over Iceberg here.</b> Both work. DuckLake is simpler to operate (the catalog is plain Postgres tables, no REST catalog service, no Glue), has faster small commits, and is native to DuckDB. Iceberg has the broader ecosystem and is what Redshift Spectrum reads. If you ever want Redshift alongside, or the org standardises on Iceberg, DuckDB 1.4 writes Iceberg too, so the marts can be re-materialised. Start with DuckLake for the learning project; the spec's Parquet-first bronze is engine-neutral either way.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Scale envelope</h2>
+  <p class="measure">Where the self-hosted DuckDB lakehouse fits comfortably, where it needs care, and where Redshift or another MPP engine is the honest answer. These are engineering judgements, not benchmarks; the load test in the next section is how you replace them with your own numbers.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Dimension</th><th>Comfortable</th><th>Needs care</th><th>Move to MPP</th></tr></thead>
+      <tbody>
+        <tr><td>Hot data queried by marts</td><td class="num"><span class="chip good">up to ~2 TB</span></td><td class="num"><span class="chip warn">2 to 10 TB</span> partition pruning and compaction become mandatory</td><td class="num"><span class="chip crit">tens of TB</span> single queries need to fan out</td></tr>
+        <tr><td>Total bronze on S3</td><td class="num"><span class="chip good">unlimited</span> it is just S3</td><td></td><td></td></tr>
+        <tr><td>Concurrent BI users</td><td class="num"><span class="chip good">up to ~20</span></td><td class="num"><span class="chip warn">20 to 100</span> PgBouncer, per-role memory limits, pre-aggregated marts</td><td class="num"><span class="chip crit">hundreds</span> you want concurrency scaling and workload queues</td></tr>
+        <tr><td>Concurrent pipeline writers</td><td class="num"><span class="chip good">up to ~10</span> DuckLake catalog transactions</td><td class="num"><span class="chip warn">10 to 50</span> catalog Postgres sizing matters</td><td></td></tr>
+        <tr><td>Single query size</td><td class="num"><span class="chip good">fits one node's NVMe</span></td><td class="num"><span class="chip warn">multi-hour scans</span> split by partition across Temporal activities</td><td class="num"><span class="chip crit">must finish in seconds over TBs</span></td></tr>
+        <tr><td>Security requirements</td><td class="num"><span class="chip good">roles, RLS, audit via Postgres</span></td><td class="num"><span class="chip warn">column masking, data residency</span> achievable, more work</td><td class="num"><span class="chip crit">mandated vendor certifications</span> a compliance question, not a technical one</td></tr>
+        <tr><td>Team size</td><td class="num"><span class="chip good">1 to ~8 engineers</span></td><td class="num"><span class="chip warn">a platform team of 3+ needed beyond this</span></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="measure">
+  <h2>Redshift, side by side</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th></th><th>Self-hosted DuckDB lakehouse</th><th>Redshift Serverless + Spectrum</th></tr></thead>
+      <tbody>
+        <tr><td>Fit to the spec's principles</td><td class="rec">Pure. Storage is S3, compute is disposable, Go writes only Parquet, no new vendor.</td><td>Good. Spectrum reads bronze in place; Redshift holds its own copy of marts.</td></tr>
+        <tr><td>Cost at this project's scale</td><td class="rec">Node time while pods run plus one small Postgres. Near zero at idle.</td><td>Per RPU-second while queries run, nothing at idle, but a per-query minimum makes chatty dashboards add up.</td></tr>
+        <tr><td>Operational load</td><td>You run Postgres with an extension, pin three versions, size nodes.</td><td class="rec">AWS runs it. You tune distribution and sort keys and WLM.</td></tr>
+        <tr><td>Enterprise controls out of the box</td><td>Assembled from Postgres features.</td><td class="rec">Native: IAM, RBAC, audit logging, encryption, VPC.</td></tr>
+        <tr><td>Horizontal query scale</td><td>None. Vertical only.</td><td class="rec">MPP, concurrency scaling.</td></tr>
+        <tr><td>Lock-in</td><td class="rec">Lowest possible. Parquet on S3 is readable by everything.</td><td>Marts live in Redshift's format; bronze stays portable.</td></tr>
+        <tr><td>What you learn</td><td class="rec">Lakehouse internals: table formats, catalogs, snapshot isolation, the compute/storage split done for real. Where the industry is heading.</td><td>Classic MPP warehouse operations. Where the industry has been. Org-relevant.</td></tr>
+        <tr><td>Hiring signal</td><td>"Built a lakehouse" reads modern; DuckDB is a strong signal with the right audience.</td><td class="rec">Redshift on a CV is universally understood.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="measure">
+  <h2>Recommendation</h2>
+  <p>Make the self-hosted DuckDB lakehouse the <b>primary</b> phase-2 path and Redshift the <b>escape hatch</b>, with the switch governed by named triggers rather than a feeling. The spec's "warehouse is the contract" principle means both can coexist: dbt gets two targets, bronze is shared, and moving marts is a re-materialisation, not a migration.</p>
+
+  <h3>Triggers that would move marts to Redshift</h3>
+  <ul class="plain">
+    <li>Hot mart data exceeds roughly five terabytes and partition pruning no longer keeps the largest mart under an hour to rebuild.</li>
+    <li>More than about fifty concurrent BI sessions, with P95 dashboard latency over the target after PgBouncer and pre-aggregation.</li>
+    <li>A security or compliance requirement that Postgres roles, RLS and pgaudit cannot satisfy, or that requires a vendor's certification.</li>
+    <li>DuckLake or pg_duckdb ships a breaking change the team cannot absorb, or either project stalls for two consecutive quarters.</li>
+  </ul>
+
+  <h3>What to prove before phase 2 commits</h3>
+  <ol class="seq">
+    <li><div><div class="t">Two dbt-duckdb pods building different marts against one DuckLake catalog</div><div class="d">Proves multi-writer coordination. Then run the same mart from both and confirm the second commit serialises rather than corrupts.</div></div></li>
+    <li><div><div class="t">Load test the serving layer</div><div class="d">Twenty, then fifty simulated dashboard sessions through PgBouncer into pg_duckdb. Record P95 latency and node memory. This is the number that decides the envelope.</div></div></li>
+    <li><div><div class="t">Kill a dbt pod mid-build</div><div class="d">Confirm the DuckLake snapshot is intact and Temporal re-runs the activity cleanly. This is the HA story; make sure it is true.</div></div></li>
+    <li><div><div class="t">Point a Redshift Spectrum external schema at the same bronze bucket</div><div class="d">Proves the escape hatch is real. Run the staging models against both targets with <code>dbt compile</code>.</div></div></li>
+    <li><div><div class="t">Time-travel a mart</div><div class="d">Query a DuckLake snapshot from a week earlier. Cheap to test, and the feature that makes debugging a bad build pleasant.</div></div></li>
+  </ol>
+
+  <p style="margin-top:22px">One honest caveat about the "foreseeable future" framing. The engine will be fine. The pieces that make it a warehouse, DuckLake and pg_duckdb, are a year or two old. Pin versions, keep bronze as the only ground truth, and re-check both projects at each phase boundary. That discipline is what makes "DuckDB for the foreseeable future" a strategy rather than a bet.</p>
+</section>
+</div>

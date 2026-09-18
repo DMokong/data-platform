@@ -1,0 +1,250 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Phase 1 Deployment",
+    "output": "docs/data-platform/diagrams/phase1.architecture.html",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1120,
+      580
+    ],
+    "views": [
+      {
+        "id": "ingest",
+        "label": "Ingestion",
+        "focus": [
+          "temporal",
+          "worker",
+          "dolt",
+          "disk"
+        ],
+        "note": "Temporal schedules the Go worker, which pulls from Dolt and writes bronze Parquet."
+      },
+      {
+        "id": "build",
+        "label": "Build and validate",
+        "focus": [
+          "worker",
+          "dbt",
+          "disk",
+          "ui"
+        ],
+        "note": "dbt-duckdb writes marts as Parquet; the UI reads them in its own process."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "dolt",
+      "type": "external",
+      "label": "Dolt server",
+      "sublabel": "beads trk · :49209",
+      "pos": [
+        300,
+        40
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "source"
+    },
+    {
+      "id": "temporal",
+      "type": "backend",
+      "label": "Temporal dev server",
+      "sublabel": "one binary · SQLite",
+      "pos": [
+        40,
+        200
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "orchestration"
+    },
+    {
+      "id": "worker",
+      "type": "backend",
+      "label": "Go worker",
+      "sublabel": "ingest + transforms",
+      "pos": [
+        300,
+        200
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "one process",
+      "brand": "go"
+    },
+    {
+      "id": "dbt",
+      "type": "backend",
+      "label": "dbt-duckdb",
+      "sublabel": "dbt build per run · views",
+      "pos": [
+        600,
+        200
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "transform"
+    },
+    {
+      "id": "ui",
+      "type": "frontend",
+      "label": "DuckDB UI",
+      "sublabel": "own process · read-only",
+      "pos": [
+        900,
+        200
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "validation"
+    },
+    {
+      "id": "disk",
+      "type": "database",
+      "label": "Local disk",
+      "sublabel": "bronze + marts Parquet",
+      "pos": [
+        600,
+        380
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "the only state"
+    },
+    {
+      "id": "grafana",
+      "type": "external",
+      "label": "Grafana Cloud",
+      "sublabel": "OTel metrics + traces",
+      "pos": [
+        40,
+        480
+      ],
+      "size": [
+        160,
+        62
+      ],
+      "tag": "observability",
+      "brand": "grafana"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "macOS workstation · single machine",
+      "wraps": [
+        "dolt",
+        "temporal",
+        "worker",
+        "dbt",
+        "ui",
+        "disk"
+      ],
+      "pad": 20
+    }
+  ],
+  "connections": [
+    {
+      "from": "temporal",
+      "to": "worker",
+      "label": "gRPC task queue",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "from": "worker",
+      "to": "dolt",
+      "label": "SQL over MySQL wire",
+      "route": "straight"
+    },
+    {
+      "from": "worker",
+      "to": "dbt",
+      "label": "exec dbt build",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "from": "dbt",
+      "to": "disk",
+      "label": "writes marts Parquet",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        680,
+        321
+      ]
+    },
+    {
+      "from": "worker",
+      "to": "disk",
+      "label": "bronze Parquet per window",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "left",
+      "via": [
+        [
+          380,
+          411
+        ]
+      ]
+    },
+    {
+      "from": "ui",
+      "to": "disk",
+      "label": "reads Parquet",
+      "variant": "dashed"
+    },
+    {
+      "from": "worker",
+      "to": "grafana",
+      "label": "OTLP",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Processes on the box",
+      "items": [
+        "Dolt server already runs for beads",
+        "Temporal dev server is one binary with SQLite persistence",
+        "One Go worker hosts Fetcher, Writer and Go transforms as activities",
+        "dbt-duckdb is shelled out per BuildMarts run"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "State",
+      "items": [
+        "Bronze and mart Parquet on local disk are the only state that matters",
+        "dev.duckdb holds views only and is rebuilt on every dbt run",
+        "Temporal's SQLite holds workflow history only"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Constraints",
+      "items": [
+        "DuckDB: one read-write process or many read-only, never both; Parquet marts keep readers off the writer's file",
+        "DuckDB UI in its own process; no Metabase in phase 1",
+        "Everything is reachable from this machine only"
+      ]
+    }
+  ]
+}

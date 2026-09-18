@@ -1,0 +1,415 @@
+<title>Data Platform Spec Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #F4F6F8;
+    --surface: #FFFFFF;
+    --surface-2: #EAEEF2;
+    --ink: #16202A;
+    --ink-2: #4E5D6B;
+    --ink-3: #7C8994;
+    --rule: #D5DCE3;
+    --accent: #1F5FA8;
+    --accent-ink: #FFFFFF;
+    --accent-soft: #E3ECF8;
+    --crit: #B3261E;  --crit-soft: #F8E4E2;
+    --warn: #9A5B00;  --warn-soft: #F8EBD6;
+    --good: #24704A;  --good-soft: #DFF0E5;
+    --note: #3C5A78;  --note-soft: #E4ECF4;
+    --code-bg: #EEF1F4;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0F151B; --surface: #161E26; --surface-2: #1E2832;
+      --ink: #E6ECF1; --ink-2: #A9B6C1; --ink-3: #7A8894; --rule: #2A3540;
+      --accent: #6FA5E8; --accent-ink: #0F151B; --accent-soft: #1B2B40;
+      --crit: #F08B84; --crit-soft: #3A1E1C;
+      --warn: #E5B36A; --warn-soft: #3A2C16;
+      --good: #7CCB9B; --good-soft: #17301F;
+      --note: #9BB8D6; --note-soft: #1B2837;
+      --code-bg: #1C2630;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F151B; --surface: #161E26; --surface-2: #1E2832;
+    --ink: #E6ECF1; --ink-2: #A9B6C1; --ink-3: #7A8894; --rule: #2A3540;
+    --accent: #6FA5E8; --accent-ink: #0F151B; --accent-soft: #1B2B40;
+    --crit: #F08B84; --crit-soft: #3A1E1C;
+    --warn: #E5B36A; --warn-soft: #3A2C16;
+    --good: #7CCB9B; --good-soft: #17301F;
+    --note: #9BB8D6; --note-soft: #1B2837;
+    --code-bg: #1C2630;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Source Sans 3", "Helvetica Neue", Arial, sans-serif;
+    font-size: 17px; line-height: 1.55;
+    padding-block: 0 64px; padding-inline: clamp(16px, 4vw, 40px);
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .measure { max-width: 72ch; }
+  h1, h2, h3 {
+    font-family: "Bricolage Grotesque", "Source Sans 3", sans-serif;
+    text-wrap: balance; margin: 0; line-height: 1.15;
+  }
+  h1 { font-size: clamp(30px, 4vw, 44px); font-weight: 700; letter-spacing: -0.01em; }
+  h2 { font-size: 26px; font-weight: 700; margin-top: 64px; margin-bottom: 8px; }
+  h3 { font-size: 19px; font-weight: 700; margin-top: 28px; margin-bottom: 6px; }
+  p { margin: 0 0 14px; }
+  code, .mono {
+    font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
+    font-size: 0.86em; background: var(--code-bg); padding: 1px 5px; border-radius: 3px;
+  }
+  pre { background: var(--code-bg); padding: 14px 16px; border-radius: 4px; overflow-x: auto; font-size: 14px; line-height: 1.5; }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  .eyebrow { font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+  .lede { font-size: 20px; color: var(--ink-2); max-width: 66ch; margin-top: 14px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 22px; color: var(--ink-3); font-size: 14px; margin-top: 18px; }
+  header { padding-block: 56px 8px; border-bottom: 1px solid var(--rule); }
+
+  /* verdict strip */
+  .verdict { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1px; background: var(--rule); margin-top: 32px; border: 1px solid var(--rule); }
+  .verdict > div { background: var(--surface); padding: 16px 18px; }
+  .verdict .k { font-size: 12.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+  .verdict .v { font-family: "Bricolage Grotesque", sans-serif; font-size: 22px; font-weight: 700; margin-top: 4px; line-height: 1.2; }
+  .verdict .s { color: var(--ink-2); font-size: 14.5px; margin-top: 4px; }
+
+  /* chips */
+  .chip { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 8px; border-radius: 3px; vertical-align: middle; white-space: nowrap; }
+  .chip.crit { background: var(--crit-soft); color: var(--crit); }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); }
+  .chip.good { background: var(--good-soft); color: var(--good); }
+  .chip.note { background: var(--note-soft); color: var(--note); }
+
+  /* findings */
+  .finding { display: grid; grid-template-columns: 120px 1fr; gap: 6px 20px; padding: 20px 0; border-top: 1px solid var(--rule); }
+  .finding:last-child { border-bottom: 1px solid var(--rule); }
+  .finding .where { font-size: 13.5px; color: var(--ink-3); margin-top: 8px; }
+  .finding h3 { margin-top: 0; }
+  .finding p:last-child { margin-bottom: 0; }
+  .finding .fix { color: var(--ink-2); }
+  .finding .fix b { color: var(--ink); }
+  @media (max-width: 600px) { .finding { grid-template-columns: 1fr; } .finding .where { margin-top: 0; } }
+
+  /* tables */
+  .tablewrap { overflow-x: auto; margin: 18px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; min-width: 620px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-size: 12.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; background: var(--surface-2); }
+  td:first-child { font-weight: 600; white-space: nowrap; }
+  td.rec { background: var(--accent-soft); }
+  .tablewrap.compare th:first-child, .tablewrap.compare td:first-child { width: 150px; }
+
+  /* right list */
+  ul.plain { padding-left: 20px; margin: 0 0 14px; }
+  ul.plain li { margin-bottom: 6px; }
+  ul.plain li b { font-weight: 600; }
+
+  /* build sequence */
+  ol.seq { list-style: none; padding: 0; margin: 20px 0 0; counter-reset: step; }
+  ol.seq li { counter-increment: step; display: grid; grid-template-columns: 56px 1fr; gap: 0 16px; padding: 14px 0; border-top: 1px solid var(--rule); }
+  ol.seq li::before { content: counter(step, decimal-leading-zero); font-family: "JetBrains Mono", monospace; font-size: 15px; color: var(--accent); font-weight: 500; padding-top: 3px; }
+  ol.seq .t { font-weight: 600; }
+  ol.seq .learn { color: var(--ink-2); font-size: 15px; margin-top: 2px; }
+  ol.seq .learn b { color: var(--ink-3); font-weight: 600; font-size: 12.5px; letter-spacing: 0.05em; text-transform: uppercase; margin-right: 6px; }
+
+  .diagram { background: var(--surface); border: 1px solid var(--rule); padding: 18px; overflow-x: auto; margin-top: 18px; }
+  .diagram pre.mermaid { background: none; padding: 0; overflow: visible; }
+  .callout { background: var(--accent-soft); border-left: 3px solid var(--accent); padding: 12px 16px; margin: 18px 0; color: var(--ink); }
+  .callout p:last-child { margin-bottom: 0; }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-top: 12px; }
+  .two h3 { margin-top: 8px; }
+  a { color: var(--accent); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Architecture review · docs/data-platform</div>
+  <h1 style="margin-top:10px">Data Platform Spec Review</h1>
+  <p class="lede">The principles are the right ones and the layering is textbook medallion. What needs work is the seam where Go and dbt actually meet, three places where the diagram contradicts the spec, and two decisions the spec defers that are cheaper to make now.</p>
+  <div class="meta">
+    <span>Reviewed 2026-09-15</span>
+    <span>Inputs: <span class="mono">data-platform-spec.md</span>, <span class="mono">data-platform-architecture.mermaid</span></span>
+    <span>Both files untracked in git</span>
+  </div>
+
+  <div class="verdict">
+    <div><div class="k">Overall</div><div class="v">Sound, ship the fixes</div><div class="s">Keep every principle. Fix the raw-layer mechanism and the diagram before writing code.</div></div>
+    <div><div class="k">Blockers</div><div class="v">2</div><div class="s">Raw-layer load model undecided · extraction window vs cadence undefined</div></div>
+    <div><div class="k">Should fix</div><div class="v">5</div><div class="s">Diagram drift, DuckDB lock trap, Go transform placement, first source, principle 5 wording</div></div>
+    <div><div class="k">Orchestrator</div><div class="v">Temporal, earlier</div><div class="s">Airflow and Dagster stay one adapter away because of the modular design</div></div>
+  </div>
+</header>
+
+<section class="measure">
+  <h2>What the spec gets right</h2>
+  <p>These are worth naming because they are the things people usually get wrong, and they are the reason the rest of this review is about seams rather than structure.</p>
+  <ul class="plain">
+    <li><b>The warehouse is the contract.</b> Making table names the only shared vocabulary between dbt and Go is exactly how you keep two transformation languages from becoming one tangle. It is also what makes the warehouse swappable later.</li>
+    <li><b>Immutable bronze with deterministic paths.</b> Window-derived paths plus overwrite-on-rerun is the correct idempotency mechanism. It gives you backfill for free and makes every downstream layer disposable.</li>
+    <li><b>Ingestion never transforms.</b> The single most common source of unreproducible pipelines is cleaning in the loader. Pushing that into staging views means a bad cast is a one-line SQL fix, not a re-extract.</li>
+    <li><b>Staging as views, marts as tables, incremental only when slow.</b> The right default ordering. Most learning projects reach for incremental models on day one and spend weeks debugging merge keys.</li>
+    <li><b>Tests placed by layer, freshness on raw.</b> Source freshness is the test that catches the failure mode nobody sees: the extractor quietly stopping. Good instinct to call it out.</li>
+    <li><b>Iceberg deferred.</b> Correct for phase 1. See the warehouse section for why it may matter earlier than "Later".</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Findings</h2>
+  <p class="measure">Graded by what happens if you build without resolving them. Blockers change the shape of the code. Should-fix items cost a rewrite of one component or a confusing week. Consider items are opinions.</p>
+
+  <div class="finding">
+    <div><span class="chip crit">Blocker</span><div class="where">Spec §3, §4, §5 · Diagram P→RAW, "raw tables loaded by Go"</div></div>
+    <div>
+      <h3>How raw tables get into the warehouse is undecided, and the two answers imply different code</h3>
+      <p>The spec says raw tables are "loaded by Go with no logic". In phase 1 that is not what happens: DuckDB reads Parquet in place, so there is no load step and Go never touches the warehouse. dbt-duckdb declares the Parquet path as an external source in <code>sources.yml</code> and the "raw table" is just a name over files. In phase 2 you face a real fork: <b>COPY into Redshift</b> (Go or dbt issues a load, data is duplicated, warehouse has its own copy) versus <b>Redshift Spectrum external tables</b> (zero-copy over S3, requires a Glue Data Catalog, raw stays Parquet-only).</p>
+      <p class="fix"><b>Recommendation:</b> commit to external tables in both phases. It honours principle 2 (Parquet is the only durable thing), principle 4 (storage separate from compute), and it means Go has no warehouse write path at all. Change the wording to "raw tables are external tables over bronze Parquet; nothing loads them." Note Glue Data Catalog as a phase-2 dependency. If you later want the COPY pattern for query speed, it becomes a dbt model that materialises raw into a native table, which keeps it inside the dbt lineage graph.</p>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div><span class="chip crit">Blocker</span><div class="where">Spec "Requirement: idempotent re-runs", §2 Runner</div></div>
+    <div>
+      <h3>Extraction window granularity and schedule cadence are not the same thing, and the spec conflates them</h3>
+      <p>"One file per source per time window" is only idempotent if the window is fully re-fetchable. A ticker running every 15 minutes writing daily-partitioned files has to choose: re-fetch the whole day each tick and overwrite (only works if the source serves history), or write a 15-minute file (96 files a day per source, which DuckDB tolerates and Spectrum/Athena punish). Sensor data also arrives late, so yesterday's file is not final at midnight.</p>
+      <p class="fix"><b>Recommendation:</b> define three parameters explicitly: <code>window</code> (the unit of a file, e.g. one hour), <code>cadence</code> (how often the runner fires), and <code>lookback</code> (how many trailing windows each run re-extracts to absorb late data). Add a compaction job later that rolls hourly files into one daily file once a day is closed. That is a classic Go job and a real data-engineering lesson. Also state which sources support history fetch; a source that only serves "current value" cannot be re-extracted and needs staging-level dedupe as the spec's fallback describes.</p>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div><span class="chip warn">Should fix</span><div class="where">Diagram W node · Spec idempotency</div></div>
+    <div>
+      <h3>Diagram says the Writer "appends Parquet"; the spec forbids appending</h3>
+      <p>Parquet cannot be appended to anyway. The format writes its schema and row-group index in a footer, so "append" means read, merge, rewrite. The spec is right and the diagram is wrong. Small, but it is the kind of drift that a future reader trusts the picture over the prose on.</p>
+      <p class="fix"><b>Fix:</b> "writes one Parquet file per window, overwrite on re-run". The corrected diagram below has it.</p>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div><span class="chip warn">Should fix</span><div class="where">Diagram GT→RAW · Spec §6</div></div>
+    <div>
+      <h3>Go transforms are drawn writing into the raw layer, and have no input arrow</h3>
+      <p>Go transform output is derived data, not raw. Putting it in RAW breaks the medallion promise that raw is what the source said. The diagram also shows Go transforms reading nothing, when in practice they consume staging or mart tables.</p>
+      <p class="fix"><b>Recommendation:</b> give Go transforms their own zone in bronze, e.g. <code>derived/&lt;transform&gt;/&lt;window&gt;.parquet</code>, written by the same Writer, and declare them in <code>sources.yml</code> as the spec already says. Then dbt marts can build on top of them and the lineage graph shows the hop honestly. This also means Go needs no DuckDB driver at all in phase 1: read Parquet with <code>parquet-go</code> or Arrow, write Parquet, done. That matters because <code>go-duckdb</code> requires CGO, which complicates cross-compiling the EKS image. Keep DuckDB out of the Go binary unless a transform genuinely needs SQL from Go.</p>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div><span class="chip warn">Should fix</span><div class="where">Spec §4 phase 1, §9</div></div>
+    <div>
+      <h3>DuckDB allows one read-write process, or many read-only processes, never both. Metabase will collide with dbt build</h3>
+      <p>A DuckDB file can be open by one process in read-write mode, or by several in read-only mode. Not a mix. Metabase holding a connection while <code>dbt build</code> runs will fail one side or the other. Metabase's DuckDB driver is also a community plugin from MotherDuck, not bundled, and lags Metabase releases.</p>
+      <p class="fix"><b>Options:</b> (a) have dbt write marts as Parquet using dbt-duckdb's <code>external</code> materialisation, and point a second, read-only DuckDB at those files for Metabase; (b) build into a temp database file and atomically rename it over the served one; (c) skip Metabase in phase 1 and use DuckDB's built-in UI (<code>duckdb -ui</code>) for validation, which is what the spec says Metabase is for anyway. Option (c) is the least work and delays the Metabase driver question to the Redshift phase where it is a first-class driver.</p>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div><span class="chip warn">Should fix</span><div class="where">Spec §1 Sources</div></div>
+    <div>
+      <h3>The first source is not concrete</h3>
+      <p>"Plant sensor readings" has no device, API, cadence, or history semantics attached. I checked Home Assistant on <code>thechengvault.local</code> and it has no plant, moisture, or soil entities. So the Fetcher has nothing to fetch yet, and the window question above cannot be answered without knowing whether the source serves history.</p>
+      <p class="fix"><b>Recommendation:</b> either name the device and its API before writing the Fetcher, or start with a source that already exists and has clean history semantics. The beads tracker is a strong candidate: Dolt speaks the MySQL wire protocol, <code>go-sql-driver/mysql</code> reads it, every row has timestamps, and issue-state history is genuinely interesting to model. Sensors can be source two.</p>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div><span class="chip warn">Should fix</span><div class="where">Spec Principle 5, §4 phase 2, §9</div></div>
+    <div>
+      <h3>"Free and open source only" contradicts Redshift, Athena and QuickSight</h3>
+      <p>Principle 5 as written excludes the whole phase-2 AWS stack. What the principle actually means is "no paid SaaS tiers for tooling; managed AWS compute is acceptable because the org already pays for it".</p>
+      <p class="fix"><b>Fix:</b> reword to "Open-source tooling; AWS managed services allowed where already approved in org. No new vendor subscriptions." That also matches the standing no-new-subscriptions rule in this workspace.</p>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div><span class="chip note">Consider</span><div class="where">Spec §3, §7</div></div>
+    <div>
+      <h3>Small gaps that cost little to close now</h3>
+      <ul class="plain">
+        <li><b>Metadata columns are not transformation.</b> State that the Writer stamps <code>_extracted_at</code>, <code>_window_start</code>, <code>_source_file</code> on every row. Freshness tests need the first one.</li>
+        <li><b>Schema evolution in bronze.</b> When a sensor grows a field, old files lack it. DuckDB handles this with <code>read_parquet(..., union_by_name=true)</code>; say so, and keep staging models explicit about columns so a new field cannot silently reach marts.</li>
+        <li><b>Timezones.</b> Bronze stores UTC. Staging converts to Australia/Sydney for daily aggregates. Daily averages that straddle a DST change are a good test case for the marts.</li>
+        <li><b>Backfill as a first-class command.</b> The idempotency design makes <code>ingest --from --to</code> trivial. Name it in the Runner section so it gets built.</li>
+        <li><b>Pipeline observability.</b> Row counts, durations, and run outcomes from the Go orchestrator, and dbt's <code>run_results.json</code>, are natural OTel emissions. This workspace already has the Grafana Cloud plumbing; reuse it rather than adding a data-observability tool.</li>
+        <li><b>Configuration and secrets.</b> The spec is silent on how a Fetcher gets credentials. Env vars locally, Kubernetes secrets on EKS, one <code>Config</code> struct per fetcher.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Orchestrator: Temporal, Airflow, or Dagster</h2>
+  <p class="measure">You asked about Temporal versus Airflow with a Go core. Dagster belongs in the comparison because it is the tool with the best dbt integration and the one the industry's "asset graph" vocabulary comes from. The three are not really competitors; they answer different questions.</p>
+
+  <div class="tablewrap compare">
+    <table>
+      <thead><tr><th></th><th>Temporal</th><th>Airflow</th><th>Dagster</th></tr></thead>
+      <tbody>
+        <tr><td>What it is</td><td class="rec">Durable execution runtime. Workflows are Go (or other SDK) code with retries, timers, signals, heartbeats persisted by the server.</td><td>Scheduler and DAG runner. Tasks are Python operators; scheduling is time-based.</td><td>Asset orchestrator. You declare data assets and their dependencies; it schedules materialisations.</td></tr>
+        <tr><td>Go fit</td><td class="rec">First-class. Temporal is written in Go and the Go SDK is the reference implementation.</td><td>Hostile. Go runs via BashOperator or KubernetesPodOperator; Airflow never sees inside it.</td><td>Same as Airflow. Python-only for definitions; Go via Pipes or subprocess.</td></tr>
+        <tr><td>dbt integration</td><td>None built in. You shell out from an Activity. dbt's own DAG stays inside <code>dbt build</code>.</td><td>Cosmos renders each dbt model as a task. Mature.</td><td class="rec">dagster-dbt makes every model a first-class asset with lineage in the UI. Best in class.</td></tr>
+        <tr><td>Data-aware semantics</td><td>None. No lineage, no partitions, no freshness policy. You build a thin pipeline layer yourself.</td><td>Data-aware scheduling since 2.4, datasets, partitions. Improving in Airflow 3.</td><td class="rec">Native: partitions, freshness policies, asset checks, lineage.</td></tr>
+        <tr><td>Local dev</td><td class="rec"><code>temporal server start-dev</code>: one binary, SQLite, web UI on :8233.</td><td>Docker compose with scheduler, webserver, metadata DB, triggerer. Heavy.</td><td><code>dagster dev</code>: one process, decent UI.</td></tr>
+        <tr><td>On EKS</td><td class="rec">Server via Helm chart plus your Go workers as Deployments. Workers scale independently.</td><td>Official Helm chart, KubernetesExecutor. Well trodden.</td><td>Helm chart, code locations as Deployments.</td></tr>
+        <tr><td>What you learn</td><td class="rec">Durable execution, determinism constraints, workflow versioning, activity idempotency. Transferable far beyond data.</td><td>The tool on most data-engineering job specs. Operator model, sensors, backfills.</td><td>The asset-graph paradigm the modern DE stack is converging on.</td></tr>
+        <tr><td>Cost of the wrong choice</td><td>You hand-roll pipeline concepts Dagster gives free.</td><td>Your Go core becomes an opaque box; you learn Airflow, not Go.</td><td>Two languages of orchestration logic; Python owns the graph.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="two">
+    <div>
+      <h3>Recommendation</h3>
+      <p>Temporal, and earlier than the spec says. The spec defers it until "several pipelines with real dependency ordering", but a ticker-based Runner is throwaway once Temporal arrives, and the point of the project is to learn the tool. The dev server costs nothing to run locally.</p>
+      <p>Do it in two moves. First, write Fetcher and Writer as plain functions with context and error returns, and keep the Runner a thin loop. Second, once one source works end to end, wrap those same functions as Activities inside an <code>IngestWindow</code> Workflow, drive it with a Temporal Schedule, and delete the ticker. Nothing in Fetcher or Writer changes.</p>
+    </div>
+    <div>
+      <h3>Why the others stay one adapter away</h3>
+      <p>Because the Go binaries do all the work and the warehouse is the contract, Airflow can wrap the same binaries with a KubernetesPodOperator in an afternoon if resume value ever matters. That is the concrete payoff of the modular design, so it is worth a sentence in the spec.</p>
+      <p>Dagster is the one to steal ideas from rather than adopt: name your Temporal workflows after assets, not jobs. <code>MaterialiseAsset(name, window)</code> reads better than <code>RunPipeline</code> and maps onto dbt selectors directly.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>dbt and Go transforms: the boundary and the build order</h2>
+  <p class="measure">The spec's rule of thumb is right: if it can be a SELECT without pain it is dbt, otherwise Go. Two things make that rule operational rather than aspirational.</p>
+
+  <h3>A transform contract both sides satisfy</h3>
+  <p class="measure">Every transform, dbt or Go, declares the same four things: input table names, one output table name, a partition window, and its tests. A dbt model gets this from its <code>ref()</code> calls and <code>schema.yml</code>. A Go transform gets it from a small struct the orchestrator can inspect. The orchestrator then holds a coarse DAG of nodes tagged <code>dbt</code> or <code>go</code>, and dbt's own fine-grained DAG lives inside each dbt node.</p>
+
+  <h3>Two dbt passes, not one</h3>
+  <p class="measure">If a Go transform reads a mart and writes a table that another mart consumes, a single <code>dbt build</code> cannot express that. Tag models and run dbt twice around the Go step:</p>
+<pre><code>dbt build --select tag:pre_go      # staging + marts the Go step reads
+go run ./cmd/transform drift --window 2026-09-14
+dbt build --select tag:post_go     # marts that consume derived/drift</code></pre>
+  <p class="measure">Or use selectors on the Go transform's declared output: <code>dbt build --select source:derived.drift+</code> rebuilds exactly what depends on it. Either way, freshness tests on the derived source catch a Go transform that silently stopped, the same way they catch a dead extractor.</p>
+
+  <div class="callout measure">
+    <p><b>An alternative worth knowing about, not adopting.</b> Bruin is a pipeline tool written in Go that does ingestion, SQL transforms, Python transforms and quality checks in one CLI with DuckDB support. It would collapse Fetcher, Writer, dbt and orchestrator into one tool. It would also mean not learning dbt, which is the industry-standard half of your stated goal. File it as a comparison point for a future post.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Warehouse path: what "industry standard" should mean here</h2>
+  <p class="measure">The spec picks Redshift because it is approved in org, which is a perfectly good reason. Be honest in the spec about the other reason: for a solo project on this data volume, DuckDB never needs replacing. You move to learn the operational shape of a server warehouse, not because DuckDB ran out.</p>
+
+  <div class="tablewrap compare">
+    <table>
+      <thead><tr><th>Target</th><th>Fits the Parquet-first design</th><th>Hidden dependencies</th><th>Cost shape</th><th>Learning value</th></tr></thead>
+      <tbody>
+        <tr><td>Redshift (Serverless)</td><td>Yes via Spectrum external tables; dialect is PostgreSQL-ish, so staging SQL mostly ports.</td><td>Glue Data Catalog for Spectrum. IAM roles. VPC if on EKS.</td><td>Pay per RPU-second while queries run, nothing at idle, but a per-query minimum makes tiny frequent queries add up.</td><td>The classic server warehouse: WLM, distribution keys, vacuum. Org-relevant.</td></tr>
+        <tr><td>Athena</td><td class="rec">Best fit. Serverless Trino over S3 Parquet; Iceberg native.</td><td>Glue Data Catalog. That is all.</td><td class="rec">Per TB scanned. On this data volume it rounds to zero.</td><td>Lakehouse query engine pattern; dbt-athena materialises Iceberg tables.</td></tr>
+        <tr><td>ClickHouse on EKS</td><td>Reads Parquet from S3 natively, but its MergeTree model is not a warehouse in dbt's sense.</td><td>Operator or StatefulSet, persistent volumes. You run it.</td><td>Node cost.</td><td>Superb for sensor time series specifically. Different mental model from dbt marts.</td></tr>
+        <tr><td>DuckDB + DuckLake</td><td>Native. DuckLake is DuckDB's own lakehouse format with a SQL catalog (Postgres) over Parquet.</td><td>A Postgres for the catalog.</td><td>Near zero.</td><td>The newest pattern and the least standard. Good for a post, risky as the only path.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="measure"><b>Two implications for the spec.</b> First, Glue Data Catalog is a phase-2 dependency for both Redshift Spectrum and Athena, so it deserves a line in the phase table. Second, Iceberg is the thing that makes the warehouse genuinely swappable, because every engine above reads it and dbt-athena writes it. The spec is right to keep it out of phase 1, but "Later" undersells it: it is the phase-2 table format decision, not an afterthought. iceberg-go being read-heavy is fine, since the Go side only ever writes bronze Parquet under the external-table model above.</p>
+  <p class="measure"><b>Dialect discipline.</b> Keep staging models free of DuckDB-only syntax (<code>read_parquet</code> belongs in <code>sources.yml</code>, not in models; avoid list and struct types and <code>QUALIFY</code>) so that repointing dbt at Redshift is a profile change and not a rewrite. A tiny CI job that runs <code>dbt compile</code> against both targets would prove it.</p>
+</section>
+
+<section>
+  <h2>Corrected architecture diagram</h2>
+  <p class="measure">Changes from the original: Writer overwrites rather than appends; raw tables are external tables with no load step; Go transforms read staging or marts and write their own derived zone in bronze; freshness tests target raw; the orchestrator runs dbt in two passes around Go transforms; DuckDB single-writer constraint noted at the warehouse.</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+    subgraph SRC["Sources"]
+        S1["Source 1 (to be named)<br/>must serve history for a window"]
+        S2["Later: Beads via Dolt/MySQL wire,<br/>sensors, spending"]
+    end
+
+    subgraph GO["Go ingestion service"]
+        F["Fetcher<br/>source protocol, rate limits, no transforms"]
+        W["Writer<br/>one Parquet file per source per window<br/>path = f(window); overwrite on re-run<br/>stamps _extracted_at, _window_start, _source_file"]
+        R["Runner<br/>window / cadence / lookback; backfill --from --to"]
+        F --> W
+        R -.-> F
+        R -.-> W
+    end
+
+    subgraph BRONZE["Bronze on disk / S3 (only durable thing)"]
+        P["raw/&lt;source&gt;/dt=YYYY-MM-DD/hh.parquet"]
+        D["derived/&lt;transform&gt;/dt=.../hh.parquet<br/>written by Go transforms"]
+        C["compaction (later): hourly -> daily files"]
+    end
+
+    subgraph WH["Warehouse (Phase 1 DuckDB: 1 writer OR n readers) / (Phase 2 Redshift or Athena via Glue)"]
+        RAW["raw + derived as EXTERNAL tables<br/>no load step; declared in sources.yml"]
+        STG["staging views<br/>casts, renames, UTC -> local<br/>explicit column lists"]
+        MART["marts tables<br/>joins, daily averages, drift"]
+        RAW --> STG --> MART
+    end
+
+    subgraph DBT["dbt Core"]
+        SRCYML["sources.yml<br/>external_location -> bronze paths<br/>freshness on _extracted_at"]
+        TESTS["dbt build: test each model as built<br/>unique / not_null on staging keys<br/>freshness on RAW"]
+    end
+
+    subgraph GOX["Go transforms"]
+        GT["read staging/marts Parquet or SQL,<br/>row logic, free text, model calls<br/>write derived/ via the same Writer"]
+    end
+
+    ORCH["Go orchestrator<br/>Phase 1: Temporal dev server, IngestWindow workflow<br/>Phase 2: Temporal on EKS, workers as Deployments<br/>dbt build tag:pre_go -> Go transforms -> dbt build tag:post_go"]
+
+    VIZ["Phase 1: DuckDB UI for validation<br/>Phase 2: Metabase / Grafana / QuickSight"]
+
+    S1 --> F
+    S2 --> F
+    W --> P
+    P -.-> C
+    P -->|"read in place"| RAW
+    D -->|"read in place"| RAW
+    SRCYML -.-> RAW
+    TESTS -.-> RAW
+    TESTS -.-> STG
+    TESTS -.-> MART
+    STG --> GT
+    MART --> GT
+    GT --> D
+    ORCH -->|"schedules"| GO
+    ORCH -->|"shells out"| DBT
+    ORCH -->|"activity"| GOX
+    MART --> VIZ
+</pre>
+  </div>
+</section>
+
+<section>
+  <h2>A build order that teaches one thing per step</h2>
+  <p class="measure">Ordered so each step is testable on its own and each introduces exactly one new data-engineering concept. The first four are a weekend; the whole list is a couple of months at an evening pace.</p>
+  <ol class="seq">
+    <li><div><div class="t">Writer with deterministic paths, test-driven</div><div class="learn"><b>learn</b> Idempotency. Path derivation from a window is pure Go and the perfect TDD target; assert that two runs of the same window produce identical bytes.</div></div></li>
+    <li><div><div class="t">One Fetcher for one concrete source, Runner as a loop</div><div class="learn"><b>learn</b> Window versus cadence versus lookback. Pick a source that serves history so re-extraction is real.</div></div></li>
+    <li><div><div class="t">dbt-duckdb project: external source, one staging view, one mart, tests</div><div class="learn"><b>learn</b> Medallion layering, external tables, <code>dbt build</code> semantics, source freshness. Run <code>dbt docs generate</code> and look at the lineage graph.</div></div></li>
+    <li><div><div class="t">Backfill command and a deliberately broken re-run</div><div class="learn"><b>learn</b> Replayability. Delete a mart, rebuild from bronze, prove nothing was lost. Then corrupt a window and re-extract it.</div></div></li>
+    <li><div><div class="t">Wrap Fetcher and Writer as Temporal Activities under an IngestWindow workflow, drive with a Schedule</div><div class="learn"><b>learn</b> Durable execution, activity retries and heartbeats, workflow determinism rules. Kill the worker mid-run and watch it resume.</div></div></li>
+    <li><div><div class="t">First Go transform writing to derived/, declared as a dbt source, two-pass build</div><div class="learn"><b>learn</b> The dbt/Go contract. Something SQL genuinely hates: free-text parsing or a per-row model call.</div></div></li>
+    <li><div><div class="t">Second source, schema drift, union_by_name, compaction job</div><div class="learn"><b>learn</b> Schema evolution and the small-files problem. Both will bite in phase 2 if not met here.</div></div></li>
+    <li><div><div class="t">OTel from the orchestrator and dbt run_results into Grafana</div><div class="learn"><b>learn</b> Pipeline observability. Reuses existing workspace plumbing.</div></div></li>
+    <li><div><div class="t">Bronze to S3, dbt profile for Athena or Redshift Spectrum, Glue catalog, compile against both targets</div><div class="learn"><b>learn</b> Storage/compute separation for real, dialect discipline, external catalogs.</div></div></li>
+    <li><div><div class="t">Temporal on EKS via Helm, workers as Deployments, Metabase against the server warehouse</div><div class="learn"><b>learn</b> Disposable pods. Everything durable is in S3 and the warehouse, so delete the namespace and rebuild it.</div></div></li>
+  </ol>
+</section>
+
+<section class="measure">
+  <h2>Decisions only you can make</h2>
+  <ul class="plain">
+    <li><b>Which source goes first?</b> A plant sensor once you have one, or beads history now. Both are real data you use. Beads has cleaner history semantics.</li>
+    <li><b>Redshift or Athena for phase 2?</b> Redshift for org relevance and the classic warehouse operational experience. Athena for the cheaper, more Parquet-native path and Iceberg from day one. The spec can keep Redshift as primary and name Athena as the fallback, or swap them.</li>
+    <li><b>Does Airflow familiarity matter for you professionally?</b> If yes, plan a one-week spike in phase 2 wrapping the Go binaries. If no, drop it from the spec entirely.</li>
+    <li><b>Metabase in phase 1 at all?</b> Given the DuckDB lock constraint, DuckDB's built-in UI does the validation job with zero setup.</li>
+  </ul>
+  <p style="margin-top:22px">When you have picked, the spec edits are small: the raw-layer wording, the window/cadence/lookback definitions, principle 5, the Go transform zone, and the phase table gaining a Glue row and a Temporal-dev-server row. The diagram above can replace the current one as is. Then it is worth a beads epic with the ten build steps as children.</p>
+</section>
+</div>

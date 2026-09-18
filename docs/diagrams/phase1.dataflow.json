@@ -1,0 +1,277 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Phase 1 Data Flow",
+    "output": "docs/data-platform/diagrams/phase1.dataflow.html",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1080,
+      540
+    ],
+    "views": [
+      {
+        "id": "hot-path",
+        "label": "Ingest to marts",
+        "focus": [
+          "beads",
+          "ingest",
+          "raw",
+          "staging",
+          "marts"
+        ],
+        "note": "Beads history becomes Parquet, then staging views, then marts."
+      },
+      {
+        "id": "go-loop",
+        "label": "Go transform loop",
+        "focus": [
+          "marts",
+          "gotx",
+          "derived"
+        ],
+        "note": "Go reads mart Parquet with parquet-go, writes derived Parquet, dbt reads it back as a source."
+      },
+      {
+        "id": "consumers",
+        "label": "Consumers",
+        "focus": [
+          "marts",
+          "viz"
+        ],
+        "note": "The DuckDB UI runs in its own process over the mart Parquet files."
+      }
+    ]
+  },
+  "stages": [
+    {
+      "label": "Sources"
+    },
+    {
+      "label": "Go ingestion"
+    },
+    {
+      "label": "Bronze (local disk)"
+    },
+    {
+      "label": "Warehouse (dbt-duckdb)"
+    },
+    {
+      "label": "Validate"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "beads",
+      "type": "external",
+      "label": "Beads tracker",
+      "sublabel": "Dolt · MySQL wire",
+      "stage": 0,
+      "row": 0,
+      "tag": "history"
+    },
+    {
+      "id": "legacy",
+      "type": "external",
+      "label": "Legacy JSONL",
+      "sublabel": "claw-* archive",
+      "stage": 0,
+      "row": 2,
+      "tag": "backfill"
+    },
+    {
+      "id": "ingest",
+      "type": "backend",
+      "label": "Fetcher → Writer",
+      "sublabel": "window · lookback",
+      "stage": 1,
+      "row": 1,
+      "width": 150,
+      "tag": "Go",
+      "brand": "go"
+    },
+    {
+      "id": "raw",
+      "type": "database",
+      "label": "bronze/raw",
+      "sublabel": "local disk, dt=/hh=",
+      "stage": 2,
+      "row": 0,
+      "tag": "immutable"
+    },
+    {
+      "id": "derived",
+      "type": "database",
+      "label": "bronze/derived",
+      "sublabel": "from Go transforms",
+      "stage": 2,
+      "row": 2,
+      "tag": "derived"
+    },
+    {
+      "id": "staging",
+      "type": "database",
+      "label": "staging views",
+      "sublabel": "casts, renames",
+      "stage": 3,
+      "row": 0,
+      "tag": "external tables"
+    },
+    {
+      "id": "marts",
+      "type": "database",
+      "label": "marts (Parquet)",
+      "sublabel": "warehouse/marts/",
+      "stage": 3,
+      "row": 1,
+      "tag": "tested"
+    },
+    {
+      "id": "gotx",
+      "type": "backend",
+      "label": "Go transforms",
+      "sublabel": "row logic · text",
+      "stage": 3,
+      "row": 2,
+      "tag": "Go",
+      "brand": "go"
+    },
+    {
+      "id": "viz",
+      "type": "frontend",
+      "label": "DuckDB UI",
+      "sublabel": "own process",
+      "stage": 4,
+      "row": 1,
+      "tag": "SQL"
+    }
+  ],
+  "flows": [
+    {
+      "id": "beads-history",
+      "from": "beads",
+      "to": "ingest",
+      "label": "events, snapshots, row history",
+      "classification": "per window",
+      "variant": "emphasis"
+    },
+    {
+      "id": "legacy-backfill",
+      "from": "legacy",
+      "to": "ingest",
+      "label": "one-off backfill",
+      "classification": "batch",
+      "variant": "dashed"
+    },
+    {
+      "id": "parquet-write",
+      "from": "ingest",
+      "to": "raw",
+      "label": "Parquet per window",
+      "classification": "overwrite on re-run",
+      "variant": "emphasis"
+    },
+    {
+      "id": "read-in-place",
+      "from": "raw",
+      "to": "staging",
+      "label": "read in place",
+      "classification": "no load step",
+      "variant": "emphasis"
+    },
+    {
+      "id": "build-marts",
+      "from": "staging",
+      "to": "marts",
+      "label": "dbt build",
+      "classification": "joins, aggregates, tests",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelAt": [
+        745,
+        214
+      ]
+    },
+    {
+      "id": "serve",
+      "from": "marts",
+      "to": "viz",
+      "label": "SQL",
+      "classification": "read-only",
+      "variant": "default"
+    },
+    {
+      "id": "go-input",
+      "from": "marts",
+      "to": "gotx",
+      "label": "reads mart Parquet",
+      "classification": "parquet-go",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelAt": [
+        745,
+        328
+      ]
+    },
+    {
+      "id": "go-output",
+      "from": "gotx",
+      "to": "derived",
+      "label": "Parquet via Writer",
+      "classification": "per window",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "right",
+      "route": "straight"
+    },
+    {
+      "id": "derived-source",
+      "from": "derived",
+      "to": "marts",
+      "label": "declared dbt source",
+      "classification": "freshness tested",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "left",
+      "via": [
+        [
+          530,
+          271
+        ]
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Hot path",
+      "items": [
+        "Beads history is extracted per time window and written once as Parquet",
+        "Staging views read Parquet in place; marts are written back as Parquet",
+        "Marts are the only tables people query"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Idempotency",
+      "items": [
+        "File path is derived from the window, never the clock",
+        "Re-running a window overwrites its file",
+        "Lookback re-extracts trailing windows to absorb late data"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Phase 1 mechanics",
+      "items": [
+        "Go transforms read mart Parquet directly with parquet-go",
+        "Every reader runs its own DuckDB over Parquet, so nobody touches dbt's writer file",
+        "dbt declares derived as a source so lineage and freshness stay honest"
+      ]
+    }
+  ]
+}
