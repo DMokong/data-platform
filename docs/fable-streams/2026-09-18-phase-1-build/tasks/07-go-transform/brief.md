@@ -47,6 +47,13 @@ Create:
 
 Modify:
 - `dbt/models/sources.yml`: **add** the `derived` source only; do not change the `beads` source.
+- `dbt/dbt_project.yml`: **conductor amendment, round 2.** Add exactly one top-level block,
+  `flags:` / `indirect_selection: buildable`, with a short comment. Nothing else in the file changes. Why:
+  under dbt's default *eager* indirect selection, `dbt build --select tag:pre_go` also selects any test that
+  touches a pre_go model, including the post_go mart's `relationships` test, which then fails in pass 1
+  because the mart does not exist yet. *Buildable* selection runs such a test only when all its parents are
+  in the build, so it runs in the post_go pass. The conductor verified this on 2026-09-19 against a clean
+  warehouse: pass 1 PASS=56, transform 142 rows, pass 2 PASS=6 including the relationships test.
 
 **Not in scope: `go.mod` / `go.sum`.** Task 08 runs in parallel and owns them. parquet-go is already required
 (task 02). Use only the standard library and existing requirements, including in tests. If you truly need a new
@@ -177,7 +184,7 @@ is kept explicit: no `init()` side-effect registration.
 cd /Users/dustincheng/projects/data-platform && test -z "$(gofmt -l internal/transform cmd/transform)" && echo GOFMT-OK
 cd /Users/dustincheng/projects/data-platform && go vet ./internal/transform/... ./cmd/transform/...
 cd /Users/dustincheng/projects/data-platform && go test -count=1 -v ./internal/transform/... ./cmd/transform/... 2>&1 | tail -40
-cd /Users/dustincheng/projects/data-platform && CGO_ENABLED=0 go build ./cmd/transform/ && ! go list -deps ./cmd/transform/ | grep -qi duckdb && echo NO-CGO-NO-DUCKDB
+cd /Users/dustincheng/projects/data-platform && CGO_ENABLED=0 go build -o /dev/null ./cmd/transform/ && ! go list -deps ./cmd/transform/ | grep -qi duckdb && echo NO-CGO-NO-DUCKDB
 cd /Users/dustincheng/projects/data-platform && echo "path-leaks: $(grep -rlE 'read_parquet|bronze/' dbt/models --include='*.sql' | wc -l | tr -d ' ')"
 cd /Users/dustincheng/projects/data-platform && rm -rf warehouse && mkdir -p warehouse/marts && dbt build --project-dir dbt --profiles-dir dbt --select tag:pre_go > /dev/null 2>&1; echo "pass1-exit=$?"; go run ./cmd/transform issue_mentions --window 2026-09-18; echo "transform-exit=$?"; dbt build --project-dir dbt --profiles-dir dbt --select tag:post_go 2>&1 | tail -8
 cd /Users/dustincheng/projects/data-platform && go run ./cmd/transform issue_mentions --window 2026-09-18 >/dev/null && ls -la bronze/derived/issue_mentions/dt=2026-09-18/ && duckdb -c "select count(*) as n_rows, count(distinct issue_id) as n_issues, max(_extracted_at) as extracted from read_parquet('bronze/derived/issue_mentions/dt=2026-09-18/part-0.parquet')"
