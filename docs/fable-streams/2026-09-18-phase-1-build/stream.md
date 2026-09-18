@@ -20,7 +20,7 @@ target_repo: /Users/dustincheng/projects/data-platform
 | 04-runner | 3 | done | 1 | trk-bam.4 · standard · 26beb88 · r1 minor (claim order, process) → r2 PASS; conductor verified lookback windows, exit codes (binary), full backfill 80 s |
 | 05-dbt-project | 4 | done | 0 | trk-bam.5 · standard · 49be8c8 · r1 PASS; conductor: 56/56 nodes, views-only, marts reconcile with Dolt (141 issues / 91 closed / 678 events) · events→issues relationships check is a singular test (dbt 1.12.5 rejects ref() in a generic where); generic relationships test added to 07 by brief amendment |
 | 06-temporal-ingest | 4 | done | 1 | trk-bam.6 · judgment · 9b5f7ab, 5b8d536 · r1 blocker (out-of-scope cmd/worker/main_test.go, removed) + minor doc → r2 PASS; conductor live run PASS in 8 s, 26 windows / 19,310 rows, spool empty · TA section persisted by conductor · for final review: cmd/worker has no tests |
-| 07-go-transform | 5 | escalated | 1 | trk-bam.7 · standard · parallel · af2afbd, 36e0a95 · r1 escalate: the conductor's own relationships-test amendment broke pass 1 (eager indirect selection) → ruled: flags.indirect_selection buildable; round 2 dispatched |
+| 07-go-transform | 5 | done | 1 | trk-bam.7 · standard · parallel · af2afbd, 36e0a95, f69645a · r1 escalate (the conductor's own amendment; eager indirect selection) → ruled buildable → r2 PASS; conductor: 142 mentions, 0 self, drift 92 pairs / 0 dangling; top mention count reconciles with the source text · TA section persisted by conductor |
 | 08-telemetry | 5 | done | 0 | trk-bam.8 · standard · parallel · 82f4c35 · r1 PASS; conductor: stdout export of the real 56-node fixture gives 12 dbt.model + 44 dbt.test spans, platform metrics, OTLP default 127.0.0.1:4317 · TA section persisted by conductor |
-| 09-buildmarts | 6 | pending | 0 | trk-bam.9 · judgment |
+| 09-buildmarts | 6 | running | 0 | trk-bam.9 · judgment |
 | 10-integration | 7 | pending | 0 | trk-bam.10 · standard |
