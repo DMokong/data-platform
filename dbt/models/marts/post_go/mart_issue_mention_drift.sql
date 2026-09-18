@@ -13,10 +13,10 @@ with latest_mention_dt as (
 
     -- `order by ... limit 1`, not `max(dt)`: DuckDB 1.11.0's statistics propagator hits an
     -- internal assertion ("Attempted to access index N within vector of size N") aggregating over
-    -- the hive-partition `dt` column of a `union_by_name` Parquet read when the glob currently
-    -- matches exactly one file (the derived source's normal state right after its first window is
-    -- materialised) -- confirmed live, reproducible with a bare `select max(dt) from
-    -- read_parquet(..., hive_partitioning = true, union_by_name = true)` against exactly one file,
+    -- the hive-partition `dt` column of this source's hive-partitioned, schema-unioned Parquet
+    -- read (external_location in sources.yml) when the glob currently matches exactly one file
+    -- (the derived source's normal state right after its first window is materialised) --
+    -- confirmed live against that same external_location expression with a bare `select max(dt)`,
     -- and gone as soon as a second file/partition exists. Top-N (order by + limit) takes a
     -- different plan path that does not trigger it.
     select dt
