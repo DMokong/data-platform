@@ -141,6 +141,20 @@ column of each kind and one row that is all NULLs. Otherwise `t.Skip`.
 `doc.go` explains, for a learner, immutable raw data, window-derived paths and overwrite-on-rerun, and includes a
 line starting `// Data-engineering concept: ` (idempotent, replayable raw layer).
 
+**Round 3 amendment (conductor, 2026-09-19, after test-adversary).** The hardened `writer_test.go` from
+test-author round 2 is now part of this task's contract. Do **not** modify any `*_test.go` file.
+- Add an unexported test seam `var forceSyncErr error` to `writer.go`, beside the existing encode-failure seam.
+  At the `tmp.Sync()` call site, when `forceSyncErr != nil`, treat it as the sync error and do not call
+  `Sync`. The failure path is otherwise unchanged: remove the temp file, leave any existing target untouched,
+  return the error.
+- Keep `zstd.Codec{…, Concurrency: 1}` as is.
+- The done-check and verification commands are unchanged. They must pass with the full hardened suite:
+  `go test -count=1 ./internal/bronze/...`, including `TestWrite_SyncFailureLeavesPriorFileIntact_AC05`,
+  `TestWrite_LargeBatchGoldenBytes_AC04`, `TestWrite_RowOrderPreservedAboveSmallBatches_AC04`,
+  `TestWrite_FalsyValuesRoundTripNotNull_AC07` and `TestWrite_TimestampTruncatesNotRounds_AC07`.
+- Commit `writer.go` **and** the hardened `writer_test.go` together. The test-author has no commit step, so
+  its changes are yours to commit in this round.
+
 ## Inputs
 
 - `/Users/dustincheng/projects/data-platform/docs/data-platform-spec.md` (Principles; Requirement: idempotent
