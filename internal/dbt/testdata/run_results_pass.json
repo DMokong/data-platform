@@ -1,0 +1,1664 @@
+{
+  "metadata": {
+    "dbt_schema_version": "https://schemas.getdbt.com/dbt/run-results/v6.json",
+    "dbt_version": "1.12.5",
+    "generated_at": "2026-09-18T17:02:36.151547Z",
+    "invocation_id": "12b85b89-63e5-41e1-bfe0-e41c25259d7c",
+    "invocation_started_at": "2026-09-18T17:02:34.918490Z",
+    "env": {}
+  },
+  "results": [
+    {
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.420529Z",
+          "completed_at": "2026-09-18T17:02:35.422975Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.437031Z",
+          "completed_at": "2026-09-18T17:02:35.472026Z"
+        }
+      ],
+      "thread_id": "Thread-3 (worker)",
+      "execution_time": 0.055506229400634766,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": "OK",
+      "failures": null,
+      "unique_id": "model.data_platform.stg_beads__dependency_snapshots",
+      "compiled": true,
+      "compiled_code": "-- One row per dependency edge per daily snapshot. Timestamp is naive UTC wall time.\n-- Key choice (documented in _staging.yml): (dependency_id, snapshot_date). Verified unique against\n-- the live bronze data: 1874 rows, 1874 distinct (id, dt) pairs, 0 null ids.\nselect\n    id as dependency_id,\n    issue_id,\n    \"type\" as dependency_type,\n    depends_on_issue_id,\n    timezone('UTC', created_at) as created_at,\n    dt as snapshot_date,\n    _extracted_at\nfrom read_parquet('bronze/raw/beads/dependencies/*/*.parquet', hive_partitioning = true, union_by_name = true)",
+      "relation_name": "\"dev\".\"main\".\"stg_beads__dependency_snapshots\"",
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.417514Z",
+          "completed_at": "2026-09-18T17:02:35.422569Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.423099Z",
+          "completed_at": "2026-09-18T17:02:35.473240Z"
+        }
+      ],
+      "thread_id": "Thread-1 (worker)",
+      "execution_time": 0.057440996170043945,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": "OK",
+      "failures": null,
+      "unique_id": "model.data_platform.stg_beads__comment_snapshots",
+      "compiled": true,
+      "compiled_code": "-- One row per comment per daily snapshot. Timestamp is naive UTC wall time.\nselect\n    id as comment_id,\n    issue_id,\n    author,\n    text as comment_text,\n    timezone('UTC', created_at) as created_at,\n    dt as snapshot_date,\n    _extracted_at\nfrom read_parquet('bronze/raw/beads/comments/*/*.parquet', hive_partitioning = true, union_by_name = true)",
+      "relation_name": "\"dev\".\"main\".\"stg_beads__comment_snapshots\"",
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.480379Z",
+          "completed_at": "2026-09-18T17:02:35.483911Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.484052Z",
+          "completed_at": "2026-09-18T17:02:35.519659Z"
+        }
+      ],
+      "thread_id": "Thread-1 (worker)",
+      "execution_time": 0.039855003356933594,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": "OK",
+      "failures": null,
+      "unique_id": "model.data_platform.stg_beads__issue_snapshots",
+      "compiled": true,
+      "compiled_code": "-- One row per issue per daily snapshot. Timestamps are naive UTC wall time in the source; convert\n-- them explicitly with timezone('UTC', ...) rather than a bare cast, because a bare\n-- timestamp -> timestamptz cast is interpreted in the session's local time zone, not UTC.\nselect\n    id as issue_id,\n    title,\n    status,\n    issue_type,\n    priority,\n    assignee,\n    timezone('UTC', created_at) as created_at,\n    timezone('UTC', updated_at) as updated_at,\n    timezone('UTC', closed_at) as closed_at,\n    close_reason,\n    description,\n    design,\n    acceptance_criteria,\n    notes,\n    dt as snapshot_date,\n    _extracted_at\nfrom read_parquet('bronze/raw/beads/issues/*/*.parquet', hive_partitioning = true, union_by_name = true)",
+      "relation_name": "\"dev\".\"main\".\"stg_beads__issue_snapshots\"",
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.521373Z",
+          "completed_at": "2026-09-18T17:02:35.522595Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.522706Z",
+          "completed_at": "2026-09-18T17:02:35.544295Z"
+        }
+      ],
+      "thread_id": "Thread-1 (worker)",
+      "execution_time": 0.02378988265991211,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": "OK",
+      "failures": null,
+      "unique_id": "model.data_platform.stg_beads__label_snapshots",
+      "compiled": true,
+      "compiled_code": "-- One row per issue label per daily snapshot.\nselect\n    issue_id,\n    label,\n    dt as snapshot_date,\n    _extracted_at\nfrom read_parquet('bronze/raw/beads/labels/*/*.parquet', hive_partitioning = true, union_by_name = true)",
+      "relation_name": "\"dev\".\"main\".\"stg_beads__label_snapshots\"",
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.419961Z",
+          "completed_at": "2026-09-18T17:02:35.422700Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.434775Z",
+          "completed_at": "2026-09-18T17:02:35.548563Z"
+        }
+      ],
+      "thread_id": "Thread-2 (worker)",
+      "execution_time": 0.13280105590820312,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": "OK",
+      "failures": null,
+      "unique_id": "model.data_platform.stg_beads__commits",
+      "compiled": true,
+      "compiled_code": "-- One row per Dolt commit (dolt_log), hourly windows on date. Timestamp is naive UTC wall time.\nselect\n    commit_hash,\n    committer,\n    timezone('UTC', \"date\") as committed_at,\n    _extracted_at\nfrom read_parquet('bronze/raw/beads/dolt_log/*/*.parquet', hive_partitioning = true, union_by_name = true)",
+      "relation_name": "\"dev\".\"main\".\"stg_beads__commits\"",
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.421160Z",
+          "completed_at": "2026-09-18T17:02:35.422845Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.435979Z",
+          "completed_at": "2026-09-18T17:02:35.550368Z"
+        }
+      ],
+      "thread_id": "Thread-4 (worker)",
+      "execution_time": 0.13878393173217773,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": "OK",
+      "failures": null,
+      "unique_id": "model.data_platform.stg_beads__events",
+      "compiled": true,
+      "compiled_code": "-- One row per beads event, deduplicated on the source id (keep the row with the greatest\n-- _extracted_at): the DST fall-back hour maps two UTC windows onto one Australia/Sydney local\n-- range, so the same event can be re-read by two adjacent hourly windows.\nwith renamed as (\n\n    select\n        id as event_id,\n        issue_id,\n        event_type,\n        actor,\n        old_value,\n        new_value,\n        comment,\n        -- events.created_at is naive Australia/Sydney wall time (spec F1); keep the naive value\n        -- under its own name so the timezone conversion below and the local-date extraction each\n        -- read the source column, not each other's output.\n        created_at as created_at_sydney_naive,\n        _extracted_at,\n        row_number() over (\n            partition by id order by _extracted_at desc\n        ) as _rn\n    from read_parquet('bronze/raw/beads/events/*/*.parquet', hive_partitioning = true, union_by_name = true)\n\n)\n\nselect\n    event_id,\n    issue_id,\n    event_type,\n    actor,\n    old_value,\n    new_value,\n    comment,\n    timezone('Australia/Sydney', created_at_sydney_naive) as created_at,\n    cast(created_at_sydney_naive as date) as created_date_local,\n    _extracted_at\nfrom renamed\nwhere _rn = 1",
+      "relation_name": "\"dev\".\"main\".\"stg_beads__events\"",
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.478768Z",
+          "completed_at": "2026-09-18T17:02:35.481230Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.481667Z",
+          "completed_at": "2026-09-18T17:02:35.556085Z"
+        }
+      ],
+      "thread_id": "Thread-3 (worker)",
+      "execution_time": 0.07891988754272461,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": "OK",
+      "failures": null,
+      "unique_id": "model.data_platform.stg_beads__issue_history",
+      "compiled": true,
+      "compiled_code": "-- One row per issue per Dolt commit that touched it (dolt_history_issues), hourly windows on\n-- commit_date. Timestamps are naive UTC wall time in the source.\nselect\n    id as issue_id,\n    commit_hash,\n    committer,\n    timezone('UTC', commit_date) as commit_date,\n    status,\n    priority,\n    issue_type,\n    assignee,\n    title,\n    timezone('UTC', created_at) as created_at,\n    timezone('UTC', updated_at) as updated_at,\n    timezone('UTC', closed_at) as closed_at,\n    close_reason,\n    description,\n    design,\n    acceptance_criteria,\n    notes,\n    _extracted_at\nfrom read_parquet('bronze/raw/beads/dolt_history_issues/*/*.parquet', hive_partitioning = true, union_by_name = true)",
+      "relation_name": "\"dev\".\"main\".\"stg_beads__issue_history\"",
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.567977Z",
+          "completed_at": "2026-09-18T17:02:35.574102Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.574375Z",
+          "completed_at": "2026-09-18T17:02:35.581919Z"
+        }
+      ],
+      "thread_id": "Thread-4 (worker)",
+      "execution_time": 0.017232894897460938,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_stg_beads__dependency_snapshots_snapshot_date.2a82bd1c9b",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect snapshot_date\nfrom \"dev\".\"main\".\"stg_beads__dependency_snapshots\"\nwhere snapshot_date is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.564315Z",
+          "completed_at": "2026-09-18T17:02:35.570121Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.570500Z",
+          "completed_at": "2026-09-18T17:02:35.584086Z"
+        }
+      ],
+      "thread_id": "Thread-2 (worker)",
+      "execution_time": 0.028219223022460938,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_stg_beads__dependency_snapshots_dependency_id_snapshot_date.17d7e95236",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect dependency_id || '|' || snapshot_date\nfrom \"dev\".\"main\".\"stg_beads__dependency_snapshots\"\nwhere dependency_id || '|' || snapshot_date is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.550597Z",
+          "completed_at": "2026-09-18T17:02:35.557137Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.557770Z",
+          "completed_at": "2026-09-18T17:02:35.583535Z"
+        }
+      ],
+      "thread_id": "Thread-1 (worker)",
+      "execution_time": 0.03672194480895996,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_stg_beads__dependency_snapshots_dependency_id.4e7055c13f",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect dependency_id\nfrom \"dev\".\"main\".\"stg_beads__dependency_snapshots\"\nwhere dependency_id is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.571119Z",
+          "completed_at": "2026-09-18T17:02:35.575446Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.575899Z",
+          "completed_at": "2026-09-18T17:02:35.586488Z"
+        }
+      ],
+      "thread_id": "Thread-3 (worker)",
+      "execution_time": 0.022205829620361328,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.unique_stg_beads__dependency_snapshots_dependency_id_snapshot_date.67aa220841",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\nselect\n    dependency_id || '|' || snapshot_date as unique_field,\n    count(*) as n_records\n\nfrom \"dev\".\"main\".\"stg_beads__dependency_snapshots\"\nwhere dependency_id || '|' || snapshot_date is not null\ngroup by dependency_id || '|' || snapshot_date\nhaving count(*) > 1\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.594014Z",
+          "completed_at": "2026-09-18T17:02:35.599012Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.599839Z",
+          "completed_at": "2026-09-18T17:02:35.605281Z"
+        }
+      ],
+      "thread_id": "Thread-1 (worker)",
+      "execution_time": 0.015004873275756836,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_stg_beads__comment_snapshots_snapshot_date.7819e2b7a3",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect snapshot_date\nfrom \"dev\".\"main\".\"stg_beads__comment_snapshots\"\nwhere snapshot_date is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.587266Z",
+          "completed_at": "2026-09-18T17:02:35.590758Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.591240Z",
+          "completed_at": "2026-09-18T17:02:35.606530Z"
+        }
+      ],
+      "thread_id": "Thread-4 (worker)",
+      "execution_time": 0.02173018455505371,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_stg_beads__comment_snapshots_comment_id.cda603dbca",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect comment_id\nfrom \"dev\".\"main\".\"stg_beads__comment_snapshots\"\nwhere comment_id is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.596892Z",
+          "completed_at": "2026-09-18T17:02:35.600446Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.600736Z",
+          "completed_at": "2026-09-18T17:02:35.614758Z"
+        }
+      ],
+      "thread_id": "Thread-3 (worker)",
+      "execution_time": 0.027192115783691406,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.unique_stg_beads__comment_snapshots_comment_id_snapshot_date.d2b747b869",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\nselect\n    comment_id || '|' || snapshot_date as unique_field,\n    count(*) as n_records\n\nfrom \"dev\".\"main\".\"stg_beads__comment_snapshots\"\nwhere comment_id || '|' || snapshot_date is not null\ngroup by comment_id || '|' || snapshot_date\nhaving count(*) > 1\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.591778Z",
+          "completed_at": "2026-09-18T17:02:35.596640Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.599139Z",
+          "completed_at": "2026-09-18T17:02:35.608716Z"
+        }
+      ],
+      "thread_id": "Thread-2 (worker)",
+      "execution_time": 0.03327798843383789,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_stg_beads__comment_snapshots_comment_id_snapshot_date.852b13da46",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect comment_id || '|' || snapshot_date\nfrom \"dev\".\"main\".\"stg_beads__comment_snapshots\"\nwhere comment_id || '|' || snapshot_date is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.635448Z",
+          "completed_at": "2026-09-18T17:02:35.640029Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.640555Z",
+          "completed_at": "2026-09-18T17:02:35.647769Z"
+        }
+      ],
+      "thread_id": "Thread-3 (worker)",
+      "execution_time": 0.015210866928100586,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_stg_beads__issue_snapshots_issue_id.5d2b7df259",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect issue_id\nfrom \"dev\".\"main\".\"stg_beads__issue_snapshots\"\nwhere issue_id is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.623840Z",
+          "completed_at": "2026-09-18T17:02:35.633408Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.633725Z",
+          "completed_at": "2026-09-18T17:02:35.648281Z"
+        }
+      ],
+      "thread_id": "Thread-4 (worker)",
+      "execution_time": 0.027376890182495117,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.accepted_values_stg_beads__issue_snapshots_status__open__in_progress__blocked__deferred__closed.994d5b36cc",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\nwith all_values as (\n\n    select\n        status as value_field,\n        count(*) as n_records\n\n    from \"dev\".\"main\".\"stg_beads__issue_snapshots\"\n    group by status\n\n)\n\nselect *\nfrom all_values\nwhere value_field not in (\n    'open','in_progress','blocked','deferred','closed'\n)\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.608899Z",
+          "completed_at": "2026-09-18T17:02:35.623730Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.632364Z",
+          "completed_at": "2026-09-18T17:02:35.648838Z"
+        }
+      ],
+      "thread_id": "Thread-1 (worker)",
+      "execution_time": 0.04349517822265625,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.accepted_values_stg_beads__issue_snapshots_issue_type__bug__feature__task__epic__chore__decision__event.c2a87c6f5b",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\nwith all_values as (\n\n    select\n        issue_type as value_field,\n        count(*) as n_records\n\n    from \"dev\".\"main\".\"stg_beads__issue_snapshots\"\n    group by issue_type\n\n)\n\nselect *\nfrom all_values\nwhere value_field not in (\n    'bug','feature','task','epic','chore','decision','event'\n)\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.637467Z",
+          "completed_at": "2026-09-18T17:02:35.640173Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.641060Z",
+          "completed_at": "2026-09-18T17:02:35.650114Z"
+        }
+      ],
+      "thread_id": "Thread-2 (worker)",
+      "execution_time": 0.016977787017822266,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_stg_beads__issue_snapshots_issue_id_snapshot_date.dcba48e16c",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect issue_id || '|' || snapshot_date\nfrom \"dev\".\"main\".\"stg_beads__issue_snapshots\"\nwhere issue_id || '|' || snapshot_date is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.658094Z",
+          "completed_at": "2026-09-18T17:02:35.662770Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.663562Z",
+          "completed_at": "2026-09-18T17:02:35.671075Z"
+        }
+      ],
+      "thread_id": "Thread-1 (worker)",
+      "execution_time": 0.018423080444335938,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_stg_beads__label_snapshots_issue_id.65106449a2",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect issue_id\nfrom \"dev\".\"main\".\"stg_beads__label_snapshots\"\nwhere issue_id is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.653650Z",
+          "completed_at": "2026-09-18T17:02:35.662640Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.663009Z",
+          "completed_at": "2026-09-18T17:02:35.673412Z"
+        }
+      ],
+      "thread_id": "Thread-3 (worker)",
+      "execution_time": 0.024443864822387695,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_stg_beads__issue_snapshots_snapshot_date.d085daa24a",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect snapshot_date\nfrom \"dev\".\"main\".\"stg_beads__issue_snapshots\"\nwhere snapshot_date is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.660448Z",
+          "completed_at": "2026-09-18T17:02:35.664170Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.664845Z",
+          "completed_at": "2026-09-18T17:02:35.674297Z"
+        }
+      ],
+      "thread_id": "Thread-2 (worker)",
+      "execution_time": 0.02026200294494629,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_stg_beads__label_snapshots_issue_id_label_snapshot_date.6f6c5be320",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect issue_id || '|' || label || '|' || snapshot_date\nfrom \"dev\".\"main\".\"stg_beads__label_snapshots\"\nwhere issue_id || '|' || label || '|' || snapshot_date is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.655950Z",
+          "completed_at": "2026-09-18T17:02:35.662886Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.664292Z",
+          "completed_at": "2026-09-18T17:02:35.677431Z"
+        }
+      ],
+      "thread_id": "Thread-4 (worker)",
+      "execution_time": 0.026108980178833008,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.unique_stg_beads__issue_snapshots_issue_id_snapshot_date.1356bf9795",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\nselect\n    issue_id || '|' || snapshot_date as unique_field,\n    count(*) as n_records\n\nfrom \"dev\".\"main\".\"stg_beads__issue_snapshots\"\nwhere issue_id || '|' || snapshot_date is not null\ngroup by issue_id || '|' || snapshot_date\nhaving count(*) > 1\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.674716Z",
+          "completed_at": "2026-09-18T17:02:35.678638Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.679099Z",
+          "completed_at": "2026-09-18T17:02:35.692306Z"
+        }
+      ],
+      "thread_id": "Thread-1 (worker)",
+      "execution_time": 0.019512176513671875,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_stg_beads__label_snapshots_label.7448c25b23",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect label\nfrom \"dev\".\"main\".\"stg_beads__label_snapshots\"\nwhere label is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.679830Z",
+          "completed_at": "2026-09-18T17:02:35.683201Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.683717Z",
+          "completed_at": "2026-09-18T17:02:35.694793Z"
+        }
+      ],
+      "thread_id": "Thread-3 (worker)",
+      "execution_time": 0.017459869384765625,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_stg_beads__label_snapshots_snapshot_date.08ac86f452",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect snapshot_date\nfrom \"dev\".\"main\".\"stg_beads__label_snapshots\"\nwhere snapshot_date is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.684546Z",
+          "completed_at": "2026-09-18T17:02:35.689425Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.689715Z",
+          "completed_at": "2026-09-18T17:02:35.713349Z"
+        }
+      ],
+      "thread_id": "Thread-2 (worker)",
+      "execution_time": 0.03682279586791992,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.unique_stg_beads__label_snapshots_issue_id_label_snapshot_date.0971495309",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\nselect\n    issue_id || '|' || label || '|' || snapshot_date as unique_field,\n    count(*) as n_records\n\nfrom \"dev\".\"main\".\"stg_beads__label_snapshots\"\nwhere issue_id || '|' || label || '|' || snapshot_date is not null\ngroup by issue_id || '|' || label || '|' || snapshot_date\nhaving count(*) > 1\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.686764Z",
+          "completed_at": "2026-09-18T17:02:35.690357Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.690558Z",
+          "completed_at": "2026-09-18T17:02:35.721389Z"
+        }
+      ],
+      "thread_id": "Thread-4 (worker)",
+      "execution_time": 0.04102492332458496,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_stg_beads__commits_commit_hash.3602063916",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect commit_hash\nfrom \"dev\".\"main\".\"stg_beads__commits\"\nwhere commit_hash is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.696077Z",
+          "completed_at": "2026-09-18T17:02:35.698810Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.698944Z",
+          "completed_at": "2026-09-18T17:02:35.758236Z"
+        }
+      ],
+      "thread_id": "Thread-1 (worker)",
+      "execution_time": 0.06340312957763672,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.unique_stg_beads__commits_commit_hash.d5c8c068fc",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\nselect\n    commit_hash as unique_field,\n    count(*) as n_records\n\nfrom \"dev\".\"main\".\"stg_beads__commits\"\nwhere commit_hash is not null\ngroup by commit_hash\nhaving count(*) > 1\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.700960Z",
+          "completed_at": "2026-09-18T17:02:35.720707Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.721531Z",
+          "completed_at": "2026-09-18T17:02:35.770357Z"
+        }
+      ],
+      "thread_id": "Thread-3 (worker)",
+      "execution_time": 0.07013082504272461,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.accepted_values_stg_beads__events_event_type__created__updated__status_changed__commented__closed__reopened__dependency_added__dependency_removed__label_added__label_removed__compacted__claimed.a59050b43c",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\nwith all_values as (\n\n    select\n        event_type as value_field,\n        count(*) as n_records\n\n    from \"dev\".\"main\".\"stg_beads__events\"\n    group by event_type\n\n)\n\nselect *\nfrom all_values\nwhere value_field not in (\n    'created','updated','status_changed','commented','closed','reopened','dependency_added','dependency_removed','label_added','label_removed','compacted','claimed'\n)\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.726626Z",
+          "completed_at": "2026-09-18T17:02:35.731929Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.732329Z",
+          "completed_at": "2026-09-18T17:02:35.789209Z"
+        }
+      ],
+      "thread_id": "Thread-4 (worker)",
+      "execution_time": 0.06418108940124512,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_stg_beads__events_event_id.fc6811c1a9",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect event_id\nfrom \"dev\".\"main\".\"stg_beads__events\"\nwhere event_id is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.723098Z",
+          "completed_at": "2026-09-18T17:02:35.729891Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.730355Z",
+          "completed_at": "2026-09-18T17:02:35.816388Z"
+        }
+      ],
+      "thread_id": "Thread-2 (worker)",
+      "execution_time": 0.09464025497436523,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.assert_events_issue_id_exists",
+      "compiled": true,
+      "compiled_code": "-- Relationships check, error severity: stg_beads__events.issue_id -> stg_beads__issue_snapshots.issue_id.\n--\n-- Restricted to events created before the latest issue snapshot's _extracted_at, less a 2-hour\n-- margin, so an event about an issue created after that day's snapshot was fetched never flakes\n-- this test. issue_snapshots is a daily snapshot; the row for the still-open day is taken AS OF\n-- the Fetcher's own extraction instant (a future AS OF instant resolves to \"latest state\", spec\n-- F2), so that row's _extracted_at is exactly the moment its coverage catches up to -- the race the\n-- brief names: \"an event whose issue was created after that day's snapshot was fetched\".\n--\n-- Written as a singular test, not the built-in `relationships` generic test, because dbt-core\n-- 1.12.5's generic-test config parser rejects any macro -- including the built-in ref() -- inside\n-- a `where` config value (confirmed live: \"the generic test configuration parser currently does\n-- not support using custom macros to populate configuration values\"). Zero rows = pass.\nwith cutoff as (\n\n    select max(_extracted_at) - interval '2 hours' as cutoff_at\n    from \"dev\".\"main\".\"stg_beads__issue_snapshots\"\n\n)\n\nselect e.event_id, e.issue_id, e.created_at\nfrom \"dev\".\"main\".\"stg_beads__events\" e\ncross join cutoff\nwhere e.issue_id is not null\n  and e.created_at < cutoff.cutoff_at\n  and not exists (\n    select 1\n    from \"dev\".\"main\".\"stg_beads__issue_snapshots\" s\n    where s.issue_id = e.issue_id\n  )",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.760447Z",
+          "completed_at": "2026-09-18T17:02:35.763309Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.763438Z",
+          "completed_at": "2026-09-18T17:02:35.827445Z"
+        }
+      ],
+      "thread_id": "Thread-1 (worker)",
+      "execution_time": 0.06866097450256348,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_stg_beads__events_issue_id.9c99de06f6",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect issue_id\nfrom \"dev\".\"main\".\"stg_beads__events\"\nwhere issue_id is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.772017Z",
+          "completed_at": "2026-09-18T17:02:35.776488Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.776627Z",
+          "completed_at": "2026-09-18T17:02:35.828116Z"
+        }
+      ],
+      "thread_id": "Thread-3 (worker)",
+      "execution_time": 0.05767083168029785,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.unique_stg_beads__events_event_id.4030a95969",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\nselect\n    event_id as unique_field,\n    count(*) as n_records\n\nfrom \"dev\".\"main\".\"stg_beads__events\"\nwhere event_id is not null\ngroup by event_id\nhaving count(*) > 1\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.792592Z",
+          "completed_at": "2026-09-18T17:02:35.796563Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.796787Z",
+          "completed_at": "2026-09-18T17:02:35.885414Z"
+        }
+      ],
+      "thread_id": "Thread-4 (worker)",
+      "execution_time": 0.09381508827209473,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.accepted_values_stg_beads__issue_history_issue_type__bug__feature__task__epic__chore__decision__event.f37c5b75f3",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\nwith all_values as (\n\n    select\n        issue_type as value_field,\n        count(*) as n_records\n\n    from \"dev\".\"main\".\"stg_beads__issue_history\"\n    group by issue_type\n\n)\n\nselect *\nfrom all_values\nwhere value_field not in (\n    'bug','feature','task','epic','chore','decision','event'\n)\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.833768Z",
+          "completed_at": "2026-09-18T17:02:35.837863Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.838019Z",
+          "completed_at": "2026-09-18T17:02:35.922758Z"
+        }
+      ],
+      "thread_id": "Thread-3 (worker)",
+      "execution_time": 0.0926673412322998,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_stg_beads__issue_history_issue_id.2de65ff259",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect issue_id\nfrom \"dev\".\"main\".\"stg_beads__issue_history\"\nwhere issue_id is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.831064Z",
+          "completed_at": "2026-09-18T17:02:35.836867Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.837118Z",
+          "completed_at": "2026-09-18T17:02:35.928660Z"
+        }
+      ],
+      "thread_id": "Thread-1 (worker)",
+      "execution_time": 0.10019707679748535,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_stg_beads__issue_history_commit_hash.c26ee9b63c",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect commit_hash\nfrom \"dev\".\"main\".\"stg_beads__issue_history\"\nwhere commit_hash is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.817843Z",
+          "completed_at": "2026-09-18T17:02:35.820727Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.823171Z",
+          "completed_at": "2026-09-18T17:02:35.940363Z"
+        }
+      ],
+      "thread_id": "Thread-2 (worker)",
+      "execution_time": 0.13550209999084473,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.accepted_values_stg_beads__issue_history_status__open__in_progress__blocked__deferred__closed.e32741f5fd",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\nwith all_values as (\n\n    select\n        status as value_field,\n        count(*) as n_records\n\n    from \"dev\".\"main\".\"stg_beads__issue_history\"\n    group by status\n\n)\n\nselect *\nfrom all_values\nwhere value_field not in (\n    'open','in_progress','blocked','deferred','closed'\n)\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.888132Z",
+          "completed_at": "2026-09-18T17:02:35.891509Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.891638Z",
+          "completed_at": "2026-09-18T17:02:35.955325Z"
+        }
+      ],
+      "thread_id": "Thread-4 (worker)",
+      "execution_time": 0.07068061828613281,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_stg_beads__issue_history_issue_id_commit_hash.3ccf835642",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect issue_id || '|' || commit_hash\nfrom \"dev\".\"main\".\"stg_beads__issue_history\"\nwhere issue_id || '|' || commit_hash is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.931788Z",
+          "completed_at": "2026-09-18T17:02:35.933293Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.933423Z",
+          "completed_at": "2026-09-18T17:02:35.988966Z"
+        }
+      ],
+      "thread_id": "Thread-1 (worker)",
+      "execution_time": 0.057736873626708984,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": "OK",
+      "failures": null,
+      "unique_id": "model.data_platform.dim_issues",
+      "compiled": true,
+      "compiled_code": "\n\n-- One row per issue, taken from the latest snapshot_date. Task 07's Go transform reads the text\n-- columns (description, design, acceptance_criteria, notes) by name (brief \"Required content\").\nwith snapshots as (\n\n    select * from \"dev\".\"main\".\"stg_beads__issue_snapshots\"\n\n),\n\nlatest as (\n\n    select max(snapshot_date) as snapshot_date from snapshots\n\n)\n\nselect\n    s.issue_id,\n    s.title,\n    s.status,\n    s.issue_type,\n    s.priority,\n    s.assignee,\n    s.created_at,\n    s.closed_at,\n    case\n        when s.closed_at is not null\n            then date_diff('second', s.created_at, s.closed_at) / 3600.0\n        else null\n    end as cycle_time_hours,\n    s.description,\n    s.design,\n    s.acceptance_criteria,\n    s.notes,\n    s.close_reason\nfrom snapshots s\ninner join latest l on s.snapshot_date = l.snapshot_date",
+      "relation_name": "\"dev\".\"main\".\"dim_issues\"",
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.924947Z",
+          "completed_at": "2026-09-18T17:02:35.929256Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.929433Z",
+          "completed_at": "2026-09-18T17:02:35.994834Z"
+        }
+      ],
+      "thread_id": "Thread-3 (worker)",
+      "execution_time": 0.07281494140625,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.unique_stg_beads__issue_history_issue_id_commit_hash.9ab18330aa",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\nselect\n    issue_id || '|' || commit_hash as unique_field,\n    count(*) as n_records\n\nfrom \"dev\".\"main\".\"stg_beads__issue_history\"\nwhere issue_id || '|' || commit_hash is not null\ngroup by issue_id || '|' || commit_hash\nhaving count(*) > 1\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.998502Z",
+          "completed_at": "2026-09-18T17:02:35.999385Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.999508Z",
+          "completed_at": "2026-09-18T17:02:36.010674Z"
+        }
+      ],
+      "thread_id": "Thread-3 (worker)",
+      "execution_time": 0.014390945434570312,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.assert_issue_not_closed_before_created",
+      "compiled": true,
+      "compiled_code": "-- Zero rows = pass: no issue's closed_at precedes its created_at.\nselect issue_id, created_at, closed_at\nfrom \"dev\".\"main\".\"dim_issues\"\nwhere closed_at is not null\n  and closed_at < created_at",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.955515Z",
+          "completed_at": "2026-09-18T17:02:35.964432Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.964633Z",
+          "completed_at": "2026-09-18T17:02:36.021767Z"
+        }
+      ],
+      "thread_id": "Thread-2 (worker)",
+      "execution_time": 0.06755828857421875,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": "OK",
+      "failures": null,
+      "unique_id": "model.data_platform.dim_issues_scd2",
+      "compiled": true,
+      "compiled_code": "\n\n-- SCD Type 2 over daily issue snapshots: one row per issue per contiguous run of unchanged\n-- (status, priority, issue_type, assignee, title). A run starts a new group whenever any tracked\n-- attribute differs from the previous snapshot_date for the same issue (or at the issue's first\n-- snapshot); a running sum of that change flag numbers the runs (\"gaps and islands\").\nwith snapshots as (\n\n    select\n        issue_id,\n        snapshot_date,\n        status,\n        priority,\n        issue_type,\n        assignee,\n        title\n    from \"dev\".\"main\".\"stg_beads__issue_snapshots\"\n\n),\n\nflagged as (\n\n    select\n        *,\n        case\n            when\n                lag(status) over w is distinct from status\n                or lag(priority) over w is distinct from priority\n                or lag(issue_type) over w is distinct from issue_type\n                or lag(assignee) over w is distinct from assignee\n                or lag(title) over w is distinct from title\n            then 1\n            else 0\n        end as is_change\n    from snapshots\n    window w as (partition by issue_id order by snapshot_date)\n\n),\n\ngrouped as (\n\n    select\n        *,\n        sum(is_change) over (\n            partition by issue_id order by snapshot_date\n            rows between unbounded preceding and current row\n        ) as run_id\n    from flagged\n\n),\n\nruns as (\n\n    select\n        issue_id,\n        run_id,\n        min(snapshot_date) as valid_from,\n        max(status) as status,\n        max(priority) as priority,\n        max(issue_type) as issue_type,\n        max(assignee) as assignee,\n        max(title) as title\n    from grouped\n    group by issue_id, run_id\n\n)\n\nselect\n    issue_id,\n    status,\n    priority,\n    issue_type,\n    assignee,\n    title,\n    valid_from,\n    lead(valid_from) over (partition by issue_id order by valid_from) as valid_to,\n    lead(valid_from) over (partition by issue_id order by valid_from) is null as is_current\nfrom runs",
+      "relation_name": "\"dev\".\"main\".\"dim_issues_scd2\"",
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:36.015041Z",
+          "completed_at": "2026-09-18T17:02:36.017855Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:36.017979Z",
+          "completed_at": "2026-09-18T17:02:36.028749Z"
+        }
+      ],
+      "thread_id": "Thread-3 (worker)",
+      "execution_time": 0.01553201675415039,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_dim_issues_issue_id.aded79700a",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect issue_id\nfrom \"dev\".\"main\".\"dim_issues\"\nwhere issue_id is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:36.023175Z",
+          "completed_at": "2026-09-18T17:02:36.026422Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:36.026673Z",
+          "completed_at": "2026-09-18T17:02:36.033080Z"
+        }
+      ],
+      "thread_id": "Thread-2 (worker)",
+      "execution_time": 0.010508060455322266,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.unique_dim_issues_issue_id.afab4edae8",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\nselect\n    issue_id as unique_field,\n    count(*) as n_records\n\nfrom \"dev\".\"main\".\"dim_issues\"\nwhere issue_id is not null\ngroup by issue_id\nhaving count(*) > 1\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:36.030020Z",
+          "completed_at": "2026-09-18T17:02:36.030737Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:36.030855Z",
+          "completed_at": "2026-09-18T17:02:36.038851Z"
+        }
+      ],
+      "thread_id": "Thread-3 (worker)",
+      "execution_time": 0.010851144790649414,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.assert_scd2_no_overlapping_intervals",
+      "compiled": true,
+      "compiled_code": "-- AC-25: no two runs for the same issue have overlapping [valid_from, valid_to) intervals.\n-- Zero rows = pass.\nwith intervals as (\n\n    select\n        issue_id,\n        valid_from,\n        coalesce(valid_to, date '9999-12-31') as valid_to_bound\n    from \"dev\".\"main\".\"dim_issues_scd2\"\n\n)\n\nselect\n    a.issue_id,\n    a.valid_from as a_valid_from,\n    a.valid_to_bound as a_valid_to,\n    b.valid_from as b_valid_from,\n    b.valid_to_bound as b_valid_to\nfrom intervals a\ninner join intervals b\n    on a.issue_id = b.issue_id\n    and a.valid_from < b.valid_from\n    and a.valid_to_bound > b.valid_from",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.990539Z",
+          "completed_at": "2026-09-18T17:02:35.991875Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.992145Z",
+          "completed_at": "2026-09-18T17:02:36.039509Z"
+        }
+      ],
+      "thread_id": "Thread-1 (worker)",
+      "execution_time": 0.05058908462524414,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.assert_event_created_matches_issue_created",
+      "compiled": true,
+      "compiled_code": "-- Proves the F1 Sydney -> UTC conversion (AC-22): every 'created' event's UTC created_at (from\n-- stg_beads__events, converted from Australia/Sydney wall time) must lie within 60 seconds of its\n-- issue's UTC created_at in the latest issue snapshot (dim_issues, converted from UTC wall time).\n-- Zero rows = pass.\nselect\n    e.event_id,\n    e.issue_id,\n    e.created_at as event_created_at,\n    d.created_at as issue_created_at,\n    abs(date_diff('second', e.created_at, d.created_at)) as diff_seconds\nfrom \"dev\".\"main\".\"stg_beads__events\" e\ninner join \"dev\".\"main\".\"dim_issues\" d on e.issue_id = d.issue_id\nwhere e.event_type = 'created'\n  and abs(date_diff('second', e.created_at, d.created_at)) > 60",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:36.034619Z",
+          "completed_at": "2026-09-18T17:02:36.035472Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:36.035639Z",
+          "completed_at": "2026-09-18T17:02:36.040408Z"
+        }
+      ],
+      "thread_id": "Thread-2 (worker)",
+      "execution_time": 0.008182048797607422,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.assert_scd2_one_current_row_per_issue",
+      "compiled": true,
+      "compiled_code": "-- AC-25: exactly one is_current row per issue. Zero rows = pass.\nselect issue_id, sum(case when is_current then 1 else 0 end) as current_count\nfrom \"dev\".\"main\".\"dim_issues_scd2\"\ngroup by issue_id\nhaving sum(case when is_current then 1 else 0 end) <> 1",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:36.044092Z",
+          "completed_at": "2026-09-18T17:02:36.050470Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:36.051080Z",
+          "completed_at": "2026-09-18T17:02:36.056230Z"
+        }
+      ],
+      "thread_id": "Thread-3 (worker)",
+      "execution_time": 0.01417684555053711,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.assert_scd2_valid_to_null_iff_current",
+      "compiled": true,
+      "compiled_code": "-- AC-25: valid_to is null if and only if is_current. Zero rows = pass.\nselect *\nfrom \"dev\".\"main\".\"dim_issues_scd2\"\nwhere (valid_to is null) != is_current",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:36.045215Z",
+          "completed_at": "2026-09-18T17:02:36.050589Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:36.051786Z",
+          "completed_at": "2026-09-18T17:02:36.057015Z"
+        }
+      ],
+      "thread_id": "Thread-1 (worker)",
+      "execution_time": 0.015413999557495117,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_dim_issues_scd2_issue_id_valid_from.f37a89c52d",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect issue_id || '|' || valid_from\nfrom \"dev\".\"main\".\"dim_issues_scd2\"\nwhere issue_id || '|' || valid_from is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:36.047871Z",
+          "completed_at": "2026-09-18T17:02:36.051669Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:36.052548Z",
+          "completed_at": "2026-09-18T17:02:36.058361Z"
+        }
+      ],
+      "thread_id": "Thread-2 (worker)",
+      "execution_time": 0.012201070785522461,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.unique_dim_issues_scd2_issue_id_valid_from.f91944955d",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\nselect\n    issue_id || '|' || valid_from as unique_field,\n    count(*) as n_records\n\nfrom \"dev\".\"main\".\"dim_issues_scd2\"\nwhere issue_id || '|' || valid_from is not null\ngroup by issue_id || '|' || valid_from\nhaving count(*) > 1\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:35.960512Z",
+          "completed_at": "2026-09-18T17:02:35.962347Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:35.962490Z",
+          "completed_at": "2026-09-18T17:02:36.069324Z"
+        }
+      ],
+      "thread_id": "Thread-4 (worker)",
+      "execution_time": 0.10959196090698242,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": "OK",
+      "failures": null,
+      "unique_id": "model.data_platform.mart_agent_activity_hourly",
+      "compiled": true,
+      "compiled_code": "\n\n-- Per UTC hour and actor: event count (events.actor) and commit count (dolt_log.committer),\n-- unioned onto one actor dimension. Partitioned by dt = the local (Australia/Sydney) date of the\n-- hour.\nwith events_hourly as (\n\n    select\n        date_trunc('hour', created_at) as hour_utc,\n        actor,\n        count(*) as events\n    from \"dev\".\"main\".\"stg_beads__events\"\n    group by 1, 2\n\n),\n\ncommits_hourly as (\n\n    select\n        date_trunc('hour', committed_at) as hour_utc,\n        committer as actor,\n        count(*) as commits\n    from \"dev\".\"main\".\"stg_beads__commits\"\n    group by 1, 2\n\n),\n\ncombined as (\n\n    select hour_utc, actor from events_hourly\n    union\n    select hour_utc, actor from commits_hourly\n\n)\n\nselect\n    c.hour_utc,\n    c.actor,\n    coalesce(e.events, 0) as events,\n    coalesce(cm.commits, 0) as commits,\n    timezone('Australia/Sydney', c.hour_utc)::date as dt\nfrom combined c\nleft join events_hourly e using (hour_utc, actor)\nleft join commits_hourly cm using (hour_utc, actor)",
+      "relation_name": "\"dev\".\"main\".\"mart_agent_activity_hourly\"",
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:36.075227Z",
+          "completed_at": "2026-09-18T17:02:36.078278Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:36.078411Z",
+          "completed_at": "2026-09-18T17:02:36.081099Z"
+        }
+      ],
+      "thread_id": "Thread-1 (worker)",
+      "execution_time": 0.006499052047729492,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_mart_agent_activity_hourly_dt.85932ce5ca",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect dt\nfrom \"dev\".\"main\".\"mart_agent_activity_hourly\"\nwhere dt is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:36.060552Z",
+          "completed_at": "2026-09-18T17:02:36.062927Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:36.063054Z",
+          "completed_at": "2026-09-18T17:02:36.116908Z"
+        }
+      ],
+      "thread_id": "Thread-3 (worker)",
+      "execution_time": 0.05703592300415039,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": "OK",
+      "failures": null,
+      "unique_id": "model.data_platform.fct_issue_events",
+      "compiled": true,
+      "compiled_code": "\n\n-- Events (already deduplicated on id in staging) enriched with the issue's current issue_type.\n-- Partitioned by dt = created_date_local (Australia/Sydney).\nselect\n    e.event_id,\n    e.issue_id,\n    e.event_type,\n    e.actor,\n    e.created_at,\n    e.created_date_local,\n    d.issue_type,\n    e.created_date_local as dt\nfrom \"dev\".\"main\".\"stg_beads__events\" e\nleft join \"dev\".\"main\".\"dim_issues\" d on e.issue_id = d.issue_id",
+      "relation_name": "\"dev\".\"main\".\"fct_issue_events\"",
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:36.118306Z",
+          "completed_at": "2026-09-18T17:02:36.120888Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:36.121003Z",
+          "completed_at": "2026-09-18T17:02:36.123713Z"
+        }
+      ],
+      "thread_id": "Thread-4 (worker)",
+      "execution_time": 0.005984067916870117,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_fct_issue_events_event_id.4caf8d11f6",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect event_id\nfrom \"dev\".\"main\".\"fct_issue_events\"\nwhere event_id is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:36.125009Z",
+          "completed_at": "2026-09-18T17:02:36.126029Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:36.126141Z",
+          "completed_at": "2026-09-18T17:02:36.142066Z"
+        }
+      ],
+      "thread_id": "Thread-1 (worker)",
+      "execution_time": 0.017473936080932617,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": "OK",
+      "failures": null,
+      "unique_id": "model.data_platform.mart_daily_throughput",
+      "compiled": true,
+      "compiled_code": "\n\n-- Per local (Australia/Sydney) date: issues created, issues closed, and event volume.\n-- issues_created / issues_closed come from dim_issues (one row per issue, current state): an\n-- issue's created_at and closed_at are fixed points, so grouping the whole dimension by their\n-- local date gives each day's totals directly, no history table needed.\nwith created as (\n\n    select\n        timezone('Australia/Sydney', created_at)::date as dt,\n        count(*) as issues_created\n    from \"dev\".\"main\".\"dim_issues\"\n    group by 1\n\n),\n\nclosed as (\n\n    select\n        timezone('Australia/Sydney', closed_at)::date as dt,\n        count(*) as issues_closed\n    from \"dev\".\"main\".\"dim_issues\"\n    where closed_at is not null\n    group by 1\n\n),\n\nevents as (\n\n    select\n        dt,\n        count(*) as events\n    from \"dev\".\"main\".\"fct_issue_events\"\n    group by 1\n\n),\n\ndates as (\n\n    select dt from created\n    union\n    select dt from closed\n    union\n    select dt from events\n\n)\n\nselect\n    d.dt,\n    coalesce(c.issues_created, 0) as issues_created,\n    coalesce(cl.issues_closed, 0) as issues_closed,\n    coalesce(e.events, 0) as events\nfrom dates d\nleft join created c using (dt)\nleft join closed cl using (dt)\nleft join events e using (dt)",
+      "relation_name": "\"dev\".\"main\".\"mart_daily_throughput\"",
+      "batch_results": null,
+      "overload_results": null
+    },
+    {
+      "status": "pass",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2026-09-18T17:02:36.143457Z",
+          "completed_at": "2026-09-18T17:02:36.146256Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2026-09-18T17:02:36.146372Z",
+          "completed_at": "2026-09-18T17:02:36.148756Z"
+        }
+      ],
+      "thread_id": "Thread-2 (worker)",
+      "execution_time": 0.005864858627319336,
+      "adapter_response": {
+        "_message": "OK"
+      },
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.data_platform.not_null_mart_daily_throughput_dt.a525f65eff",
+      "compiled": true,
+      "compiled_code": "\n    \n    \n\n\n\nselect dt\nfrom \"dev\".\"main\".\"mart_daily_throughput\"\nwhere dt is null\n\n\n",
+      "relation_name": null,
+      "batch_results": null,
+      "overload_results": null
+    }
+  ],
+  "elapsed_time": 0.8053297996520996,
+  "args": {
+    "include_saved_query": false,
+    "print": true,
+    "use_catalogs_v2": false,
+    "indirect_selection": "eager",
+    "require_unique_project_resource_names": false,
+    "write_json": true,
+    "show": false,
+    "log_level_file": "debug",
+    "allow_jinja_file_extensions": false,
+    "use_colors_file": true,
+    "require_ref_searches_node_package_before_root": false,
+    "cache_selected_only": false,
+    "exclude_resource_types": [],
+    "show_resource_report": false,
+    "use_colors": true,
+    "introspect": true,
+    "require_sql_header_in_test_configs": false,
+    "validate_macro_args": true,
+    "show_all_deprecations": false,
+    "which": "build",
+    "upload_to_artifacts_ingest_api": false,
+    "use_fast_test_edges": false,
+    "latest_version_pointer_enabled_by_default": false,
+    "project_dir": "dbt",
+    "partial_parse": true,
+    "support_custom_ref_kwargs": false,
+    "log_file_max_bytes": 10485760,
+    "defer": false,
+    "quiet": false,
+    "log_path": "dbt/logs",
+    "require_batched_execution_for_custom_microbatch_strategy": true,
+    "enable_grouped_warn_error_parser_logs": false,
+    "partial_parse_file_diff": true,
+    "select": [
+      "tag:pre_go"
+    ],
+    "require_source_and_semantic_model_names_without_spaces": false,
+    "resource_types": [],
+    "maximum_seed_size_mib": 1,
+    "exclude": [],
+    "state_modified_compare_more_unrendered_values": true,
+    "state_modified_compare_vars": false,
+    "export_saved_queries": false,
+    "empty": false,
+    "version_check": true,
+    "log_format_file": "debug",
+    "vars": {},
+    "invocation_command": "dbt build --project-dir dbt --profiles-dir dbt --select tag:pre_go",
+    "warn_error_options": {
+      "error": [],
+      "warn": [],
+      "silence": []
+    },
+    "populate_cache": true,
+    "favor_state": false,
+    "require_resource_names_without_spaces": true,
+    "sqlparse": {
+      "MAX_GROUPING_DEPTH": null,
+      "MAX_GROUPING_TOKENS": null
+    },
+    "profiles_dir": "dbt",
+    "macro_debugging": false,
+    "use_v2_parser": false,
+    "require_explicit_package_overrides_for_builtin_materializations": true,
+    "send_anonymous_usage_stats": true,
+    "v2_parser": "dbt-core-experimental-parser parse",
+    "hints_enabled": true,
+    "require_yaml_configuration_for_mf_time_spines": true,
+    "static_parser": true,
+    "require_valid_schema_from_generate_schema_name": false,
+    "printer_width": 80,
+    "require_corrected_analysis_fqns": false,
+    "snowflake_projects_otel": false,
+    "log_level": "info",
+    "strict_mode": false,
+    "source_freshness_run_project_hooks": true,
+    "require_nested_cumulative_type_params": true,
+    "log_format": "default",
+    "require_generic_test_arguments_property": true,
+    "skip_nodes_if_on_run_start_fails": true,
+    "require_all_warnings_handled_by_warn_error": true
+  }
+}
