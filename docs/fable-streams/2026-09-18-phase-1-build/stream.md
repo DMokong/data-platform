@@ -24,3 +24,37 @@ target_repo: /Users/dustincheng/projects/data-platform
 | 08-telemetry | 5 | done | 0 | trk-bam.8 · standard · parallel · 82f4c35 · r1 PASS; conductor: stdout export of the real 56-node fixture gives 12 dbt.model + 44 dbt.test spans, platform metrics, OTLP default 127.0.0.1:4317 · TA section persisted by conductor |
 | 09-buildmarts | 6 | done | 0 | trk-bam.9 · judgment · 43eccfd · r1 PASS; verifier cmd-1 gofmt hit was conductor scratch (ruled, cleaned) · conductor live run PASS in 15 s: ingest 26 windows → BuildMarts pre_go 56 / transform 142 / post_go 6, all spans present; default OTLP export to Alloy flushes cleanly · TA section persisted by conductor |
 | 10-integration | 7 | done | 0 | trk-bam.10 · standard · f2185d9 · r1 PASS; conductor: make check exits 0 (fmt/vet/test-live/build/doc.go/file-writer/hygiene all OK), go 1.25.4, tidy -diff clean, no tracked local state, README runbook reviewed cold |
+
+## Handoff
+
+Phases R–4 and the Phase-5 final audit were run by an **Opus 5 conductor in emulation mode**, with fable-mode loaded.
+- **What's done.** All 10 tasks are `done`: stories trk-bam.1–10 are closed, each with the reviewer verdict and
+  conductor-verified evidence in the ledger. Every task commit is on branch `phase-1` (no remote).
+- **Audit.** `final-audit.js` ran with panelSize 5: 46/46 ACs satisfied on the blinded cold read. The 5
+  refute-panel findings were triaged in `audit.md § "## fable — round 1"`. Two came from voter scratch files,
+  which were cleaned; three are evidence nitpicks.
+- **Escalations.** Nothing is `deferred`. `escalations.md` holds 5 adjudicated entries, all ruled at opus tier:
+  - the Writer test-adversary residue: an equivalent mutant;
+  - the Writer's `forceSyncErr` seam amendment;
+  - task 07's eager-indirect-selection escalation, caused by the conductor's own amendment and fixed with
+    `indirect_selection: buildable`;
+  - task 09's gofmt hit from a conductor scratch file.
+- **Evidence.** Everything lives in `tasks/*/report.md`. Some test-author sections were blocked by the harness
+  and persisted verbatim by the conductor with provenance notes.
+- **For the Fable final review:**
+  - stale comments at `internal/bronze/writer_test.go:15` and `:918-944`;
+  - the accepted seam-only `Sync` mutant blind spot;
+  - `cmd/worker` has no tests: its `main_test.go` was removed as out of scope;
+  - the events→issues relationships check is a race-guarded singular test, because dbt 1.12.5 rejects `ref()`
+    in a generic test's `where`; the generic `relationships` test lives on the post_go drift mart;
+  - the architecture spec says `hh=` prunes, but only the `dt=` directory is a partition (F4);
+  - Alloy→Grafana Cloud forwarding is unverified: the conductor confirmed only a clean OTLP flush to
+    127.0.0.1:4317.
+
+What remains:
+- extend `conductor_model` with the reviewing tier;
+- the whole-branch final review;
+- the delivery choice (merge / keep; no remote exists);
+- the Gate-5 report;
+- `phase: done`;
+- closing epic trk-bam.
