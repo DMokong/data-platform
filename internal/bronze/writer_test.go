@@ -10,20 +10,11 @@ package bronze
 // return values (Result) and the bytes it puts on disk, read back through parquet-go's public
 // reader API — never internal Writer state.
 //
-// REQUIRED IMPLEMENTATION HOOK (read this before making these tests pass):
-// TestWrite_EncodeFailureLeavesPriorFileIntact_AC05 below sets a package-level variable named
-// forceEncodeErr. That variable does not exist yet; the implementer must declare it in a
-// non-test file (e.g. writer.go) as:
-//
-//	// forceEncodeErr, when non-nil, is returned by (*Writer).Write in place of a successful
-//	// encode, as if the Parquet encoder had failed after Batch validation but before (or
-//	// during) writing rows to the temp file. Write must still remove the temp file it had
-//	// begun (or never create one) and leave any existing target file untouched, exactly like
-//	// any other encode failure (AC-05). Always nil in production; only this package's own
-//	// tests ever set it, and they reset it afterwards.
-//	var forceEncodeErr error
-//
-// and consult it once per Write call, at (or before) the point where rows are actually encoded.
+// IMPLEMENTATION HOOK: TestWrite_EncodeFailureLeavesPriorFileIntact_AC05 sets the package-level
+// variable forceEncodeErr, declared in writer.go. When non-nil it is returned in place of a
+// successful encode, as if the Parquet encoder had failed after Batch validation; Write must still
+// remove its temp file and leave any existing target untouched (AC-05). It is always nil in
+// production; only this package's tests set it, and they reset it afterwards.
 // No other test in this file depends on any unexported symbol.
 
 import (
@@ -915,33 +906,13 @@ func TestWrite_TimestampTruncatesNotRounds_AC07(t *testing.T) {
 
 // --- AC-05 durability: fsync before rename (breaker-2 v5) --------------------------------------
 //
-// REQUIRED IMPLEMENTATION HOOK (not yet declared; read before running this test):
-// TestWrite_SyncFailureLeavesPriorFileIntact_AC05 below sets a package-level variable named
-// forceSyncErr, mirroring forceEncodeErr above. It does not exist yet and must be declared in a
-// non-test file (e.g. writer.go), consulted at the exact call site that syncs the temp file before
-// close/rename, for example:
-//
-//	// forceSyncErr, when non-nil, is returned by (*Writer).Write in place of tmp.Sync()'s own
-//	// result, as if the durability sync itself had failed. Write must still remove the temp file
-//	// and leave any existing target file untouched, exactly like any other pre-rename failure
-//	// (AC-05). Always nil in production; only this package's own tests ever set it, and they
-//	// reset it afterwards.
-//	var forceSyncErr error
-//
-//	if err := tmp.Sync(); err != nil {
-//		return 0, err
-//	}
-//	if forceSyncErr != nil {
-//		return 0, forceSyncErr
-//	}
-//
-// Placing the check immediately after the real tmp.Sync() call (rather than replacing it) means this
-// seam only proves the sync step's call site is reached and its failure is handled — the same
-// assurance forceEncodeErr gives for encode failures, and the same reason AC-05's brief names "sync"
-// as an explicit step in Write's rules. Until the hook is declared, this identifier is undefined and
-// `go test ./internal/bronze/...` fails to build with "undefined: forceSyncErr" — a legitimate
-// failing-first result under this package's established Mode-A convention (see forceEncodeErr's own
-// history in this file), not a broken test.
+// IMPLEMENTATION HOOK: TestWrite_SyncFailureLeavesPriorFileIntact_AC05 sets the package-level
+// variable forceSyncErr, declared in writer.go beside forceEncodeErr. When non-nil, replaceFile
+// takes it as the result of the durability sync and does not call tmp.Sync() at all, so the test
+// proves the sync step's call site is reached and its failure is handled like any other
+// pre-rename failure (AC-05). It cannot prove that a build which deletes the tmp.Sync() call
+// loses durability: that mutant is an accepted blind spot of this suite (escalations.md,
+// 02-writer). Always nil in production; only this package's tests set it, and they reset it.
 //
 // Why this test is needed: test-breaker round 1 / breaker-2 v5 removed the writer's single
 // tmp.Sync() call. Every existing AC-05 test (Overwrite, EncodeFailure, ContextCancelled) only

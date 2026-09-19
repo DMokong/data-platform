@@ -214,3 +214,9 @@ That edit was in task 10's brief scope, which was docs-only, so no AC covers it 
 (both byte-identical to HEAD), `internal/window/window_edge_cases_test.go` and a 43 MB `worker` binary at the repo
 root. All were untracked and all were deleted. No tracked file was modified: `git status` showed only
 `audit.md` changed.
+
+## fable — round 2
+
+Fable-tier review of the audit (2026-09-19T01:35Z). All five refute-panel rulings above are confirmed with independent
+evidence (`make check` green; `go.mod` 1.25.4 vs toolchain 1.25.5 documented; information_schema 13 VIEW / 0 BASE
+TABLE; `dbt source freshness` 8/8 PASS). The whole-branch findings the audit did not raise are in `gate5-report.md`.

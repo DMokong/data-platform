@@ -79,7 +79,7 @@ bronze/raw/<source>/<table>/dt=YYYY-MM-DD/hh=HH.parquet      # written by Fetche
 bronze/derived/<transform>/dt=YYYY-MM-DD/hh=HH.parquet       # written by Go transforms
 ```
 
-Hive-style `dt=` / `hh=` partitions so every engine (DuckDB, Redshift Spectrum, Athena, Trino) prunes on them.
+The Hive-style `dt=` directory is the partition every engine (DuckDB, Redshift Spectrum, Athena, Trino) prunes on. `hh=HH` is only the file name within a day: engines skip those files by their own min/max row-group statistics, not by name (phase-1 finding F4).
 
 **Compaction** (later): once a day is closed, roll its hourly files into one `dt=YYYY-MM-DD/part-0.parquet`. DuckDB is indifferent; server engines over S3 are not, and 24 small files a day per table adds up. The compactor is a Go job under the same idempotency rule (output path derived from the day).
 

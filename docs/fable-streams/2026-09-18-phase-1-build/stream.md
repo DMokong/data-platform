@@ -1,8 +1,8 @@
 ---
 stream: 2026-09-18-phase-1-build
-phase: finalize
+phase: done
 entry: spec
-conductor_model: opus (claude-opus-5, emulation mode, fable-mode loaded) — phases R-4
+conductor_model: opus (claude-opus-5, emulation mode, fable-mode loaded) — phases R-4 and final audit; fable (claude-fable-5-1) — phase 5 whole-branch review
 weave:
   superpowers: "loaded — brainstorming not used (kickoff entered at phase 2; design = docs/data-platform-spec.md); writing-plans read, its file-map / interfaces / right-sizing / self-review rules applied to plan.md, its full-code-per-step format not used"
   speculator: "loaded but not bound — kickoff directs a built-in spec.md on branch phase-1 under pre-existing epic trk-bam"
@@ -58,3 +58,9 @@ What remains:
 - the Gate-5 report;
 - `phase: done`;
 - closing epic trk-bam.
+
+## Phase 5 — Fable review (2026-09-19)
+
+Whole-branch review complete: **accept**. Evidence, findings, tier disclosure and delivery options are in
+[`gate5-report.md`](gate5-report.md). Two doc fixes landed with this commit (spec §3 `hh=` wording; stale hook comments
+in `internal/bronze/writer_test.go`). Delivery (merge / keep) is pending Dustin's choice on epic trk-bam.
