@@ -64,3 +64,10 @@ What remains:
 Whole-branch review complete: **accept**. Evidence, findings, tier disclosure and delivery options are in
 [`gate5-report.md`](gate5-report.md). Two doc fixes landed with this commit (spec §3 `hh=` wording; stale hook comments
 in `internal/bronze/writer_test.go`). Delivery (merge / keep) is pending Dustin's choice on epic trk-bam.
+
+## Delivery (2026-09-19)
+
+Option 1 taken by Dustin himself: `main` fast-forwarded 7bd9f96 → 1f32b55 (== `phase-1`) and pushed to
+https://github.com/DMokong/data-platform (public, default branch `main`). Verified by the Fable conductor:
+`git ls-remote origin main` = 1f32b55c4e4dc41c2fc5e185d95ec8c727e76eea, local `main` tracks `origin/main`,
+no credential patterns in the tracked tree. Epic trk-bam closed; follow-ups filed under the phase 1.1 epic.
