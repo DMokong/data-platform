@@ -5673,7 +5673,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <ul>
           <li>&bull; Same Fetcher, Writer and window rules; only the medium moved from disk to S3</li>
           <li>&bull; Raw is still read in place as external tables; nothing is loaded</li>
-          <li>&bull; Staging and marts are the same dbt models, repointed at a DuckLake target</li>
+          <li>&bull; Staging and marts are the same dbt models, but the repoint is an objective, not done: marts still hard-code a DuckDB materialisation and a local path</li>
         </ul>
       </div>
 
@@ -5683,9 +5683,9 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <h3>New in phase 2</h3>
         </div>
         <ul>
-          <li>&bull; Mart builds commit through the DuckLake catalog on RDS, so concurrent dbt pods are safe</li>
-          <li>&bull; A Postgres-wire serving layer sits between marts and every reader</li>
-          <li>&bull; Auth, row-level security and audit come from Postgres roles at that layer</li>
+          <li>&bull; Mart builds commit through the DuckLake catalog on RDS, which is what should make concurrent dbt pods safe</li>
+          <li>&bull; A Postgres-wire serving layer is the candidate front door; pg_duckdb does not list DuckLake as tested</li>
+          <li>&bull; Auth, row-level security and audit are meant to come from Postgres roles; that is a spike, not a result</li>
         </ul>
       </div>
     </div>

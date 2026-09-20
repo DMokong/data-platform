@@ -25,7 +25,7 @@ Four more diagrams open up the orchestrator (§8) and dbt (§5), and are phase-i
 ## Principles
 
 1. **The warehouse is the contract, not the language.** dbt models and Go transforms both read tables and write tables. Neither knows the other exists; they agree only on table names.
-2. **Extraction is persistent, not transient.** Raw data is written to Parquet once and kept forever. Everything downstream is derived and rebuildable; the Parquet is the only thing you'd miss.
+2. **Extraction is persistent, not transient.** Raw data is written to Parquet and kept forever. Everything downstream is derived and rebuildable; the Parquet is the only thing you'd miss. Bronze is **durable, replayable and deterministically addressed** rather than write-once: re-extracting a window rewrites that window's file in place, which is the mechanism, not a violation of it.
 3. **Ingestion never transforms.** If a field is being cleaned in Go before the write, it belongs in a staging model instead. Stamping ingestion metadata (`_extracted_at`, `_window_start`, `_window_end`, `_source_file`) on every row is not transformation — it is provenance, and the freshness tests depend on it.
 4. **Storage is separate from compute.** Nothing durable lives on pod disk. Compute processes are disposable; the only state is object storage plus a catalog.
 5. **Open-source tooling; no new vendor subscriptions.** dbt Core (Apache), DuckDB (MIT), Temporal server (MIT). AWS managed services already approved in org (S3, Redshift, Glue) are allowed. No hosted tiers, no new SaaS.
@@ -38,6 +38,7 @@ Running the same extract twice must leave the platform in the same state, never 
 - File paths are **deterministic**, derived from the time window being extracted — never from the wall clock at run time.
 - One file per source per time window. Re-running a window **overwrites** that file; it never appends a second copy. (Parquet cannot be appended to in any case: the schema and row-group index live in a footer.)
 - dbt rebuilds from whatever is on disk, so a re-run is just a re-run — no cleanup step, no manual dedupe.
+- **Two strengths of "same", and they are not interchangeable.** *Byte identity* holds only when the same spooled payload is rewritten with the same `extractedAt`, which is what a retried `WriteWindow` does. A genuine re-extraction of the same window is *semantically equal*: the same business rows under the same keys, with the provenance columns free to differ. Tests must assert the right one; asserting byte identity across a real re-extraction will fail on `_extracted_at` alone.
 - Staging-level dedupe on a natural key is the **fallback only**, for sources where duplicates cannot be prevented at write time. Prefer fixing it at the file level.
 
 Three parameters, declared per source, make this operational:
@@ -74,7 +75,7 @@ The push shape is the one worth understanding. SNS keeps nothing and cannot be a
 | `comments`, `dependencies`, `labels` | 389 / 116 / 278 | Daily snapshot | Joins for marts. |
 | `dolt_log` | 1,104 commits | Hourly windows on `date` | Commit cadence = agent activity. |
 
-Legacy `claw-*` history (726 issues) lives in `docs/archive/beads-legacy-2026-08-21/*.jsonl` and is a one-off backfill via a second Fetcher.
+Legacy `claw-*` history (726 issues) lives **outside this repository**, in the claudeclaw workspace at `docs/archive/beads-legacy-2026-08-21/*.jsonl`. It is a possible one-off backfill via a second Fetcher, not a wired-up phase-1 input; the files would have to be copied in or pointed at by absolute path first.
 
 **Source two, designed here but not yet built: an SNS topic.** An ad hoc stream with no schedule and no retention. It reaches bronze through a durable landing zone:
 
@@ -86,10 +87,12 @@ SNS topic ──subscription──▶ SQS queue ──long poll──▶ Receive
                        publish Timestamp, dedupes on MessageId, hands rows to the Writer
 ```
 
-- **Subscribe an SQS queue to the topic**, with raw message delivery **off** so the SNS envelope survives: `MessageId`, `Timestamp`, `TopicArn`, `MessageAttributes`. That envelope is the provenance. The queue buffers for 14 days, so a Receiver outage costs nothing.
+- **Subscribe an SQS queue to the topic**, with raw message delivery **off** so the SNS envelope survives: `MessageId`, `Timestamp`, `TopicArn`, `MessageAttributes`. That envelope is the provenance. The queue buffers for 14 days, so a Receiver outage does not lose messages from the *queue*. Getting them into bronze afterwards is a separate guarantee; see the recovery contract below.
 - **The Receiver** long-polls, writes each batch to the landing zone, and only then deletes those messages from the queue. Write before acknowledge: a crash between the two steps produces a duplicate in landing, never a loss.
 - **Windows are cut on publish time, not receive time.** A message published inside one window can land after that window closed, so the source's `lookback` absorbs it exactly as it absorbs a late row from a pull source.
 - **Dedupe on `MessageId`.** SQS delivers at least once, so the Fetcher dedupes while building the window. Bronze is effectively-once and nothing downstream needs to know.
+- **Recovery is an explicit path, not a property of the lookback.** This is the one place the design can silently lose data. A Receiver that has been down longer than the source's `lookback` comes back and lands messages whose publish windows the schedule no longer visits. Those rows reach `landing/` and stop there, forever. The Receiver therefore keeps a **watermark**: the oldest publish timestamp it has landed and not yet seen materialised. After every batch, and on startup, it compares that watermark against the lookback horizon and signals `MaterialiseWindow(source, window)` directly for every window that falls outside it. That signal is a first-class code path with its own acceptance test: take the Receiver down past the lookback, publish into the gap, bring it back, and assert the rows appear in bronze.
+- **Queue mechanics are part of the contract**, not incidental configuration. Set a visibility timeout longer than the worst-case land-and-delete and extend it by heartbeat for a slow batch; delete only once the landing write is durable; set a `maxReceiveCount` with a dead-letter queue so a single poison message cannot stall the lane; and alarm on DLQ depth and on `ApproximateAgeOfOldestMessage`, which is the metric that tells you the lane has stopped.
 - **Kinesis Data Firehose is the managed service that does the Receiver's job**, and it is not available in this org. That absence is the only reason the Receiver exists.
 
 The message body stays an opaque string in bronze and is unpacked in a staging model, because ingestion never transforms (principle 3).
@@ -106,7 +109,7 @@ Four small pieces. The first three are the whole pipeline for a pull source; the
 Fetcher and Writer are plain functions taking `context.Context` and returning an error, so they became Temporal Activities unchanged. Phase 1 went straight to Temporal instead of building a throwaway ticker first; see §8.
 
 ### 3. Bronze layer (raw)
-Parquet files. Immutable, replayable, columnar, compressed. Read natively by DuckDB and Go. Phase 1 on local disk; phase 2 on S3.
+Parquet files. Durable, replayable, deterministically addressed, columnar, compressed. Read natively by DuckDB and Go. Phase 1 on local disk; phase 2 on S3.
 
 Two zones, same Writer, same path rule:
 
@@ -147,7 +150,15 @@ The Hive-style `dt=` directory is the partition every engine (DuckDB, Redshift S
     - **Serving layer** — Postgres with the `pg_duckdb` extension loaded. RDS only permits AWS-approved extensions and `pg_duckdb` is not one, so this instance is a **pod in the cluster** (StatefulSet or plain Deployment; it holds no durable state of its own, it reads the catalog and S3). If pg_duckdb ever lands on RDS, the two collapse into one managed instance.
 - Not a fit for the warehouse role: RDS row-store engines. ClickHouse would suit sensor time series but is a different model from dbt marts.
 
-**Dialect discipline** so the migration is a profile change and not a rewrite: `read_parquet` and paths live in `sources.yml`, never in models; avoid DuckDB-only types (list, struct) and syntax (`QUALIFY`) in staging; run `dbt compile` against both targets in CI once phase 2 starts.
+#### Phase-2 entry gate
+
+Two load-bearing phase-2 claims are **objectives, not achievements**, and neither should be repeated as settled until its spike passes. Both are entry criteria for phase 2, alongside the five checks in the viability analysis.
+
+**Gate A — the migration really is a repoint.** Today it is not. Every mart hard-codes `materialized='external'` together with a literal local `location=`, and `sources.yml` hard-codes `read_parquet` over relative bronze paths. Moving target would edit every mart file. Passing this gate means: materialisation and location resolve from the target rather than being written into each model; external locations come from a variable or an environment-specific macro; a second output exists in `profiles.yml`; and `dbt compile` succeeds against both targets in CI. Until then, say the migration is *designed to be* a profile change.
+
+**Gate B — the serving layer actually serves.** `pg_duckdb` does not list DuckLake among its tested extensions, so the whole serving tier is a hypothesis. Passing this gate means demonstrating, on real data: DuckLake extension loading under `pg_duckdb`; a committed snapshot visible to a reader; concurrent dbt writers and BI readers without corruption; transaction boundaries behaving; pooling under PgBouncer; `GRANT` and row-level security actually enforced on a mart; `pgaudit` producing a usable log; and clean behaviour across a restart. Until it passes, this route is the **candidate** serving layer, and Redshift remains the fallback with no such unknowns.
+
+**Dialect discipline**, which is what makes Gate A reachable: `read_parquet` and paths live in `sources.yml`, never in models; avoid DuckDB-only types (list, struct) and syntax (`QUALIFY`) in staging; run `dbt compile` against both targets in CI once phase 2 starts.
 
 ### 5. dbt Core
 Three tiers, kept strictly separate:
@@ -182,7 +193,7 @@ Go side: the Writer's path derivation is pure and test-driven — two runs of on
 Go, on **Temporal**. Airflow was considered and dropped: it would add a Python orchestration layer over the Go core and could only see the Go binaries as opaque pods. Dagster was considered for its asset-graph model; borrow the vocabulary (workflows named after the asset they materialise, not the job) without adopting the tool.
 
 - One `MaterialiseWindow(source, window)` Workflow per source; Fetcher and Writer are Activities with retries and heartbeats. A Temporal **Schedule** replaces the ticker.
-- **Rows never travel inside a workflow payload.** The largest hourly window measured is about 6 MB, well over Temporal's 2 MB default limit. `FetchWindow` writes rows to a spool file under `local/spool/` and returns only a reference: path, row count, fetch instant. `WriteWindow` reads the spool and writes bronze, and a third Activity deletes it. This claim-check belongs to the orchestrator rather than to any source, so it carries into phase 2 with the spool on a volume or in object storage.
+- **Rows never travel inside a workflow payload.** The largest hourly window measured is about 6 MB, well over Temporal's 2 MB default limit. `FetchWindow` writes rows to a spool file under `local/spool/` and returns only a reference: path, row count, fetch instant. `WriteWindow` reads the spool and writes bronze, and a third Activity deletes it. This claim-check belongs to the orchestrator rather than to any source, so it carries into phase 2 — but **object storage, not a pod volume**. A retried activity can be scheduled onto a different worker, so a pod-local path cannot satisfy the contract, and a shared filesystem would add another durable service to run. Phase 2 therefore specifies: spool objects under a dedicated `spool/` prefix keyed by run and activity id, server-side encrypted, with a lifecycle rule expiring them after a few days so an orphan cannot accumulate cost, deleted on success by the existing `DeleteSpool` activity, and owned by the same IRSA role as bronze.
 - A `BuildMarts(window)` Workflow runs: `dbt build --select tag:pre_go` → Go transforms as Activities → `dbt build --select tag:post_go`. dbt's own DAG stays inside each `dbt build`.
 - Phase 1: `temporal server start-dev` locally. Phase 2: Temporal server via Helm on EKS, Go workers as Deployments. Multiple workers writing to different bronze partitions is safe (separate files); only the warehouse needs to handle concurrency, which is the phase-2 warehouse question.
 

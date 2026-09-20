@@ -42,7 +42,7 @@
           "dbtpods",
           "catalog"
         ],
-        "note": "dbt-duckdb workers read bronze in place and commit marts through the DuckLake catalog on RDS."
+        "note": "dbt-duckdb workers write mart objects to the bucket and commit only metadata to the DuckLake catalog on RDS."
       },
       {
         "id": "serving",
@@ -165,8 +165,8 @@
     {
       "id": "bronze",
       "type": "cloud",
-      "label": "S3 bronze/",
-      "sublabel": "bronze + ducklake",
+      "label": "S3 bucket",
+      "sublabel": "bronze/ · ducklake/",
       "pos": [
         760,
         250
@@ -347,7 +347,7 @@
     {
       "from": "bronze",
       "to": "dbtpods",
-      "label": "read in place",
+      "label": "reads bronze/",
       "route": "straight"
     },
     {
@@ -371,7 +371,7 @@
     {
       "from": "bronze",
       "to": "serving",
-      "label": "reads Parquet",
+      "label": "reads mart objects",
       "variant": "dashed",
       "route": "straight",
       "labelAt": [
@@ -435,6 +435,32 @@
         660,
         560
       ]
+    },
+    {
+      "from": "dbtpods",
+      "to": "bronze",
+      "label": "writes mart Parquet",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "right",
+      "via": [
+        [
+          1080,
+          360
+        ],
+        [
+          1000,
+          360
+        ],
+        [
+          1000,
+          281
+        ]
+      ],
+      "labelAt": [
+        1000,
+        336
+      ]
     }
   ],
   "cards": [
@@ -462,7 +488,7 @@
       "items": [
         "RDS Postgres holds the DuckLake catalog and Temporal persistence: plain tables, managed, Multi-AZ",
         "The serving Postgres runs pg_duckdb, which RDS does not offer, so it is a pod; it holds no durable state",
-        "Redshift Spectrum can still read the same bronze bucket if the named triggers are hit"
+        "One bucket, three prefixes: bronze/, ducklake/ and landing/. The catalog holds metadata only"
       ]
     }
   ]
