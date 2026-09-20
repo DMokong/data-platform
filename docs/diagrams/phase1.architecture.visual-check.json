@@ -6,7 +6,7 @@
   "status": "pass",
   "visualReview": "pending",
   "artifact": {
-    "path": "/Users/dustincheng/projects/claudeclaw/docs/data-platform/diagrams/phase1.architecture.html",
+    "path": "/Users/dustincheng/projects/data-platform/docs/diagrams/phase1.architecture.html",
     "sha256": "9b10f6cf409a28c52df1aab02bc36cc03e04652cc088497d5d43b6466749d75d",
     "bytes": 812481
   },

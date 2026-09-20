@@ -261,9 +261,8 @@
       "dot": "rose",
       "title": "Failure is scoped to one window",
       "items": [
-        "The retry leaves the rail and rejoins it: Temporal re-runs until the budget is spent",
-        "WriteWindow and DeleteSpool retry the same way and are not drawn",
-        "Only that window stops. Its siblings still land"
+        "The retry leaves the rail and rejoins it; only that window stops, its siblings land",
+        "WriteWindow and DeleteSpool retry the same way and are not drawn"
       ]
     }
   ]

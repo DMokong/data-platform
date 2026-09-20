@@ -6,9 +6,9 @@
   "status": "pass",
   "visualReview": "pending",
   "artifact": {
-    "path": "/Users/dustincheng/projects/claudeclaw/docs/data-platform/diagrams/phase1.dataflow.html",
-    "sha256": "4a45c70091df659188c7829b275f009d5d83284fa0007035dd1b00988a70a18a",
-    "bytes": 817740
+    "path": "/Users/dustincheng/projects/data-platform/docs/diagrams/phase1.dataflow.html",
+    "sha256": "4195b0c009213554c45895d2b655f76226754862c7a1b6681869aba596b36ef4",
+    "bytes": 817758
   },
   "state": {
     "detail": "read",
