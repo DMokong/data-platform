@@ -18,8 +18,13 @@ the self-hosted DuckDB viability analysis, and interactive archify diagrams unde
 
 - `cmd/` and `internal/` — Go module: Fetcher, Writer, Runner, Temporal workflows/activities, Go transforms.
 - `dbt/` — dbt-duckdb project: `sources.yml` over bronze paths, staging views, marts as Parquet (`external` materialisation).
-- `bronze/`, `warehouse/` — local Parquet zones (gitignored).
+- `bronze/`, `warehouse/`, `local/` — Parquet zones, dbt's DuckDB file and the Temporal spool (all gitignored).
+- `scripts/` — `live-materialise.sh` (end-to-end run) and `marts-views.sql`.
 - `docs/` — spec, decision log, reviews, diagrams. `docs/fable-streams/` holds conductor streams.
+
+`make check` is the quality gate: gofmt, vet, live tests, a CGO-free build, a `doc.go` per package,
+the file-writer confinement check and repo hygiene. Run it before claiming anything is done.
+`make help` lists the runbook targets; `README.md` walks them in order.
 
 ## Tracker
 
@@ -35,7 +40,11 @@ installed; pinned versions are in the spec's decision log. Install commands: Duc
 Temporal CLI via `brew install duckdb temporal`; dbt-core + dbt-duckdb via
 `uv tool install --python 3.12 dbt-core --with dbt-duckdb`.
 
-## Source one: beads
+## Sources
 
-Dolt server `127.0.0.1:49209`, database `trk`, MySQL wire protocol, user `root`, no TLS. Tables and
-extraction shapes are in spec §1. Treat it as read-only.
+**Source one, built: beads.** Dolt server `127.0.0.1:49209`, database `trk`, MySQL wire protocol,
+user `root`, no TLS. Tables and extraction shapes are in spec §1. Treat it as read-only.
+
+**Source two, designed but not built: an SNS topic.** Spec §1 carries the full design (SNS to SQS
+to a Receiver to a `landing/` zone, then the ordinary Fetcher windows it into bronze). Tracked as
+`trk-dva.3`. Do not invent a different shape for it; the spec's source-shape table is binding.
