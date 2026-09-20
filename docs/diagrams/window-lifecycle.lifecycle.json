@@ -7,7 +7,7 @@
     "quality_profile": "showcase",
     "viewBox": [
       1080,
-      570
+      650
     ],
     "views": [
       {
@@ -24,21 +24,21 @@
       },
       {
         "id": "retry",
-        "label": "Failure and retry",
+        "label": "The retry cycle",
         "focus": [
           "fetching",
-          "activity_fail",
+          "retrying",
+          "spooled",
           "poisoned"
         ],
-        "note": "An activity failure retries in place; only an exhausted budget stops that one window."
+        "note": "A failed activity drops out of the rail, retries, and rejoins it. Only an exhausted budget is terminal."
       },
       {
         "id": "reentry",
         "label": "Why a settled window reopens",
         "focus": [
           "settled",
-          "due",
-          "written"
+          "due"
         ],
         "note": "Lookback and backfill re-enter the ordinary path and overwrite the same file."
       }
@@ -51,7 +51,11 @@
     },
     {
       "id": "trouble",
-      "label": "Failure and quiet paths"
+      "label": "Retry cycle"
+    },
+    {
+      "id": "terminal",
+      "label": "Terminal exit"
     }
   ],
   "states": [
@@ -106,30 +110,23 @@
       "tag": "stable"
     },
     {
-      "id": "activity_fail",
-      "type": "failure",
-      "label": "Activity failed",
-      "sublabel": "source down, disk full",
+      "id": "retrying",
+      "type": "waiting",
+      "label": "Retrying",
+      "sublabel": "budget remaining",
       "lane": "trouble",
       "col": 0,
-      "tag": "retryable"
-    },
-    {
-      "id": "orphan",
-      "type": "failure",
-      "label": "Orphaned spool",
-      "sublabel": "crash before delete",
-      "lane": "trouble",
-      "col": 1,
-      "tag": "disk only"
+      "width": 110,
+      "tag": "Temporal"
     },
     {
       "id": "poisoned",
       "type": "failure",
       "label": "Retries exhausted",
       "sublabel": "this window alone",
-      "lane": "trouble",
-      "col": 2,
+      "lane": "terminal",
+      "col": 0,
+      "width": 110,
       "tag": "terminal"
     }
   ],
@@ -154,7 +151,7 @@
       "variant": "emphasis",
       "route": "straight",
       "labelAt": [
-        270,
+        325,
         202
       ]
     },
@@ -185,51 +182,70 @@
     {
       "id": "t5",
       "from": "fetching",
-      "to": "activity_fail",
-      "label": "error",
+      "to": "retrying",
+      "label": "activity error",
       "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "left",
+      "via": [
+        [
+          248,
+          307
+        ]
+      ],
       "labelAt": [
-        280,
-        235
-      ]
-    },
-    {
-      "id": "t6",
-      "from": "activity_fail",
-      "to": "fetching",
-      "label": "retry in place",
-      "variant": "emphasis",
-      "labelAt": [
-        375,
-        262
-      ]
-    },
-    {
-      "id": "t7",
-      "from": "activity_fail",
-      "to": "poisoned",
-      "label": "budget spent",
-      "variant": "security",
-      "route": "bottom-channel"
-    },
-    {
-      "id": "t8",
-      "from": "written",
-      "to": "orphan",
-      "label": "crash before DeleteSpool",
-      "variant": "dashed",
-      "labelAt": [
-        556,
+        248,
         245
       ]
     },
     {
-      "id": "t10",
+      "id": "t6",
+      "from": "retrying",
+      "to": "spooled",
+      "label": "retry succeeds",
+      "variant": "emphasis",
+      "labelAt": [
+        402,
+        245
+      ]
+    },
+    {
+      "id": "t7",
+      "from": "retrying",
+      "to": "poisoned",
+      "label": "budget spent",
+      "variant": "security",
+      "labelAt": [
+        402,
+        350
+      ]
+    },
+    {
+      "id": "t8",
       "from": "settled",
       "to": "due",
       "label": "lookback or backfill re-enters",
       "variant": "emphasis",
-      "route": "top-channel"
+      "fromSide": "top",
+      "toSide": "left",
+      "via": [
+        [
+          710,
+          84
+        ],
+        [
+          18,
+          84
+        ],
+        [
+          18,
+          157
+        ]
+      ],
+      "labelAt": [
+        400,
+        74
+      ]
     }
   ],
   "cards": [
@@ -237,16 +253,16 @@
       "dot": "emerald",
       "title": "Why re-entry is safe",
       "items": [
-        "Every path back into Due lands on the same deterministic file path, and the write overwrites it",
-        "Lookback re-enters trailing windows every run; backfill re-enters an arbitrary range, with no cleanup step"
+        "Every path back into Due lands on the same file path, and the write overwrites it",
+        "Lookback re-enters trailing windows; backfill re-enters any range. No cleanup step"
       ]
     },
     {
       "dot": "rose",
       "title": "Failure is scoped to one window",
       "items": [
-        "Temporal retries in place; the state does not advance until the activity succeeds, and an exhausted budget stops that window alone",
-        "An orphaned spool costs disk, never correctness: the next run rewrites the same target"
+        "The retry leaves the rail and rejoins it: Temporal re-runs until the budget is spent",
+        "Only that window stops. Its siblings still land"
       ]
     }
   ]
