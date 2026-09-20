@@ -5171,8 +5171,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <path data-edge-from="fetching" data-edge-to="spooled" data-edge-label="rows to spool" data-edge-key="1" data-edge-id="t2" data-composition-points="307,157;343,157" d="M 307 157 L 343 157" class="a-emphasis" stroke-width="2" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="spooled" data-edge-to="written" data-edge-label="WriteWindow, overwrite" data-edge-key="2" data-edge-id="t3" data-composition-points="461,157;497,157" d="M 461 157 L 497 157" class="a-emphasis" stroke-width="2" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="written" data-edge-to="settled" data-edge-label="lookback moves on" data-edge-key="3" data-edge-id="t4" data-composition-points="615,157;651,157" d="M 615 157 L 651 157" class="a-emphasis" stroke-width="2" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="fetching" data-edge-to="retrying" data-edge-label="activity error" data-edge-key="4" data-edge-id="t5" data-composition-points="248,188;248,307;347,307" d="M 248 188 L 248 297 Q 248 307 258 307 L 347 307" class="a-security" stroke-width="1.1" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="retrying" data-edge-to="spooled" data-edge-label="retry succeeds" data-edge-key="5" data-edge-id="t6" data-composition-points="402,278;402,188" d="M 402 278 L 402 188" class="a-emphasis" stroke-width="2" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="fetching" data-edge-to="retrying" data-edge-label="fetch error" data-edge-key="4" data-edge-id="t5" data-composition-points="248,188;248,307;347,307" d="M 248 188 L 248 297 Q 248 307 258 307 L 347 307" class="a-security" stroke-width="1.1" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="retrying" data-edge-to="spooled" data-edge-label="fetch succeeds" data-edge-key="5" data-edge-id="t6" data-composition-points="402,278;402,188" d="M 402 278 L 402 188" class="a-emphasis" stroke-width="2" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="retrying" data-edge-to="poisoned" data-edge-label="budget spent" data-edge-key="6" data-edge-id="t7" data-composition-points="402,336;402,450" d="M 402 336 L 402 450" class="a-security" stroke-width="1.1" marker-end="url(#arrowhead-security)"/>
         <path data-edge-from="settled" data-edge-to="due" data-edge-label="lookback or backfill re-enters" data-edge-key="7" data-edge-id="t8" data-composition-points="710,126;710,84;18,84;18,157;35,157" d="M 710 126 L 710 94 Q 710 84 700 84 L 28 84 Q 18 84 18 94 L 18 148.5 Q 18 157 26.5 157 L 35 157" class="a-emphasis" stroke-width="2" marker-end="url(#arrowhead-emphasis)"/>
 
@@ -5244,14 +5244,14 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <text data-detail="fine" x="710" y="177" class="t-database" font-size="7" text-anchor="middle">stable</text>
         </g>
 
-        <g id="node-retrying" data-node-id="retrying" data-node-label="Retrying" tabindex="0" role="button" aria-label="Focus Retrying, budget remaining, Retry cycle" aria-pressed="false" data-node-kind="waiting" data-node-sublabel="budget remaining" data-node-tag="Temporal" data-node-context="Retry cycle">
-          <title>Retrying · budget remaining · Retry cycle · Temporal</title>
+        <g id="node-retrying" data-node-id="retrying" data-node-label="Fetch retry" tabindex="0" role="button" aria-label="Focus Fetch retry, budget remaining, Retry cycle" aria-pressed="false" data-node-kind="waiting" data-node-sublabel="budget remaining" data-node-tag="Temporal" data-node-context="Retry cycle">
+          <title>Fetch retry · budget remaining · Retry cycle · Temporal</title>
           <rect x="347" y="278" width="110" height="58" rx="7" class="c-mask"/>
           <rect x="347" y="278" width="110" height="58" rx="7" class="c-cloud" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="waiting" class="semantic-sigil s-cloud" transform="translate(440 284) scale(0.6875)">
             <path d="M4 2.5h8M4 13.5h8M5 3c0 2.8 2 3.2 3 5-1 1.8-3 2.2-3 5M11 3c0 2.8-2 3.2-3 5 1 1.8 3 2.2 3 5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="402" y="299" class="t-primary" font-size="10" font-weight="600" text-anchor="middle">Retrying</text>
+          <text data-node-label="" data-detail-anchor="" x="402" y="299" class="t-primary" font-size="10" font-weight="600" text-anchor="middle">Fetch retry</text>
           <text data-detail="context" x="402" y="315" class="t-muted" font-size="7" text-anchor="middle">budget remaining</text>
         <text data-detail="fine" x="402" y="325" class="t-cloud" font-size="7" text-anchor="middle">Temporal</text>
         </g>
@@ -5286,13 +5286,13 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <rect x="585.35" y="191" width="95.30000000000001" height="16" rx="4" class="c-mask"/>
           <text x="633" y="202" class="t-backend" font-size="8" text-anchor="middle">lookback moves on</text>
         </g>
-        <g data-detail="context" data-edge-from="fetching" data-edge-to="retrying" data-edge-label="activity error" data-edge-key="4" data-edge-id="t5">
-          <rect x="207.7" y="234" width="80.60000000000001" height="16" rx="4" class="c-mask"/>
-          <text x="248" y="245" class="t-security" font-size="8" text-anchor="middle">activity error</text>
+        <g data-detail="context" data-edge-from="fetching" data-edge-to="retrying" data-edge-label="fetch error" data-edge-key="4" data-edge-id="t5">
+          <rect x="215.05" y="234" width="65.9" height="16" rx="4" class="c-mask"/>
+          <text x="248" y="245" class="t-security" font-size="8" text-anchor="middle">fetch error</text>
         </g>
-        <g data-detail="context" data-edge-from="retrying" data-edge-to="spooled" data-edge-label="retry succeeds" data-edge-key="5" data-edge-id="t6">
+        <g data-detail="context" data-edge-from="retrying" data-edge-to="spooled" data-edge-label="fetch succeeds" data-edge-key="5" data-edge-id="t6">
           <rect x="361.7" y="234" width="80.60000000000001" height="16" rx="4" class="c-mask"/>
-          <text x="402" y="245" class="t-backend" font-size="8" text-anchor="middle">retry succeeds</text>
+          <text x="402" y="245" class="t-backend" font-size="8" text-anchor="middle">fetch succeeds</text>
         </g>
         <g data-detail="context" data-edge-from="retrying" data-edge-to="poisoned" data-edge-label="budget spent" data-edge-key="6" data-edge-id="t7">
           <rect x="366.6" y="339" width="70.80000000000001" height="16" rx="4" class="c-mask"/>
@@ -5531,6 +5531,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         </div>
         <ul>
           <li>&bull; The retry leaves the rail and rejoins it: Temporal re-runs until the budget is spent</li>
+          <li>&bull; WriteWindow and DeleteSpool retry the same way and are not drawn</li>
           <li>&bull; Only that window stops. Its siblings still land</li>
         </ul>
       </div>

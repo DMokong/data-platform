@@ -1,4 +1,5 @@
 # local state (anchored to the repo root so Go packages like internal/bronze stay tracked)
+.DS_Store
 /.beads/
 /local/
 *.duckdb

@@ -3,7 +3,7 @@
   "diagram_type": "architecture",
   "meta": {
     "title": "Phase 1 Deployment",
-    "output": "docs/data-platform/diagrams/phase1.architecture.html",
+    "output": "docs/diagrams/phase1.architecture.html",
     "quality_profile": "showcase",
     "viewBox": [
       1120,
