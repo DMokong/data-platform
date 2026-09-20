@@ -5173,7 +5173,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 
         <!-- Flow paths -->
         <path data-edge-from="beads" data-edge-to="ingest" data-edge-label="events, snapshots, row history" data-edge-key="0" data-edge-id="beads-history" data-composition-points="156,157;198,157;198,264;240,264" d="M 156 157 L 198 157 L 198 264 L 240 264" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="legacy" data-edge-to="ingest" data-edge-label="one-off backfill" data-edge-key="1" data-edge-id="legacy-backfill" data-composition-points="156,385;198,385;198,278;240,278" d="M 156 385 L 198 385 L 198 278 L 240 278" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="legacy" data-edge-to="ingest" data-edge-label="not wired up" data-edge-key="1" data-edge-id="legacy-backfill" data-composition-points="156,385;198,385;198,278;240,278" d="M 156 385 L 198 385 L 198 278 L 240 278" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="ingest" data-edge-to="raw" data-edge-label="Parquet per window" data-edge-key="2" data-edge-id="parquet-write" data-composition-points="390,271;432,271;432,157;474,157" d="M 390 271 L 432 271 L 432 157 L 474 157" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="raw" data-edge-to="staging" data-edge-label="read in place" data-edge-key="3" data-edge-id="read-in-place" data-composition-points="586,157;689,157" d="M 586 157 L 689 157" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="staging" data-edge-to="marts" data-edge-label="dbt build" data-edge-key="4" data-edge-id="build-marts" data-composition-points="745,186;745,242" d="M 745 186 L 745 242" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
@@ -5196,8 +5196,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <text data-detail="fine" x="100" y="175" class="t-external" font-size="7" text-anchor="middle">history</text>
         </g>
 
-        <g id="node-legacy" data-node-id="legacy" data-node-label="Legacy JSONL" tabindex="0" role="button" aria-label="Focus Legacy JSONL, claw-* archive, 01 / Sources" aria-pressed="false" data-node-kind="external" data-node-sublabel="claw-* archive" data-node-tag="backfill" data-node-context="01 / Sources">
-          <title>Legacy JSONL · claw-* archive · 01 / Sources · backfill</title>
+        <g id="node-legacy" data-node-id="legacy" data-node-label="Legacy JSONL" tabindex="0" role="button" aria-label="Focus Legacy JSONL, external · off-repo, 01 / Sources" aria-pressed="false" data-node-kind="external" data-node-sublabel="external · off-repo" data-node-tag="historical" data-node-context="01 / Sources">
+          <title>Legacy JSONL · external · off-repo · 01 / Sources · historical</title>
           <rect x="44" y="356" width="112" height="58" rx="6" class="c-mask"/>
           <rect x="44" y="356" width="112" height="58" rx="6" class="c-external" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(50 362) scale(0.6875)">
@@ -5205,8 +5205,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
           <text data-node-label="" data-detail-anchor="" x="100" y="377" class="t-primary" font-size="10" font-weight="600" text-anchor="middle">Legacy JSONL</text>
-          <text data-detail="context" x="100" y="393" class="t-muted" font-size="7" text-anchor="middle">claw-* archive</text>
-        <text data-detail="fine" x="100" y="403" class="t-external" font-size="7" text-anchor="middle">backfill</text>
+          <text data-detail="context" x="100" y="393" class="t-muted" font-size="7" text-anchor="middle">external · off-repo</text>
+        <text data-detail="fine" x="100" y="403" class="t-external" font-size="7" text-anchor="middle">historical</text>
         </g>
 
         <g id="node-ingest" data-node-id="ingest" data-node-label="Fetcher → Writer" tabindex="0" role="button" aria-label="Focus Fetcher → Writer, window · lookback, 02 / Go ingestion, Go" aria-pressed="false" data-node-kind="backend" data-node-sublabel="window · lookback" data-node-tag="Go" data-node-context="02 / Go ingestion" data-node-brand="Go" data-node-brand-id="go" data-node-brand-status="preset" data-node-brand-source="https://blog.golang.org/go-brand">
@@ -5316,9 +5316,9 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <text x="198" y="200.5" class="t-backend" font-size="8" text-anchor="middle">events, snapshots, row history</text>
         <text data-detail="fine" x="198" y="211.5" class="t-dim" font-size="7" text-anchor="middle">per window</text>
         </g>
-        <g data-detail="context" data-edge-from="legacy" data-edge-to="ingest" data-edge-label="one-off backfill" data-edge-key="1" data-edge-id="legacy-backfill">
-          <rect x="152.8" y="310.5" width="90.4" height="27" rx="4" class="c-mask"/>
-          <text x="198" y="321.5" class="t-messagebus" font-size="8" text-anchor="middle">one-off backfill</text>
+        <g data-detail="context" data-edge-from="legacy" data-edge-to="ingest" data-edge-label="not wired up" data-edge-key="1" data-edge-id="legacy-backfill">
+          <rect x="162.6" y="310.5" width="70.8" height="27" rx="4" class="c-mask"/>
+          <text x="198" y="321.5" class="t-messagebus" font-size="8" text-anchor="middle">not wired up</text>
         <text data-detail="fine" x="198" y="332.5" class="t-dim" font-size="7" text-anchor="middle">batch</text>
         </g>
         <g data-detail="context" data-edge-from="ingest" data-edge-to="raw" data-edge-label="Parquet per window" data-edge-key="2" data-edge-id="parquet-write">

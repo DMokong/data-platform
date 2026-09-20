@@ -112,7 +112,7 @@
     {
       "id": "retrying",
       "type": "waiting",
-      "label": "Retrying",
+      "label": "Fetch retry",
       "sublabel": "budget remaining",
       "lane": "trouble",
       "col": 0,
@@ -183,7 +183,7 @@
       "id": "t5",
       "from": "fetching",
       "to": "retrying",
-      "label": "activity error",
+      "label": "fetch error",
       "variant": "security",
       "fromSide": "bottom",
       "toSide": "left",
@@ -202,7 +202,7 @@
       "id": "t6",
       "from": "retrying",
       "to": "spooled",
-      "label": "retry succeeds",
+      "label": "fetch succeeds",
       "variant": "emphasis",
       "labelAt": [
         402,
@@ -262,6 +262,7 @@
       "title": "Failure is scoped to one window",
       "items": [
         "The retry leaves the rail and rejoins it: Temporal re-runs until the budget is spent",
+        "WriteWindow and DeleteSpool retry the same way and are not drawn",
         "Only that window stops. Its siblings still land"
       ]
     }

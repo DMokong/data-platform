@@ -3,7 +3,7 @@
   "diagram_type": "dataflow",
   "meta": {
     "title": "Phase 1 Data Flow",
-    "output": "docs/data-platform/diagrams/phase1.dataflow.html",
+    "output": "docs/diagrams/phase1.dataflow.html",
     "quality_profile": "showcase",
     "viewBox": [
       1080,
@@ -74,10 +74,10 @@
       "id": "legacy",
       "type": "external",
       "label": "Legacy JSONL",
-      "sublabel": "claw-* archive",
+      "sublabel": "external · off-repo",
       "stage": 0,
       "row": 2,
-      "tag": "backfill"
+      "tag": "historical"
     },
     {
       "id": "ingest",
@@ -159,7 +159,7 @@
       "id": "legacy-backfill",
       "from": "legacy",
       "to": "ingest",
-      "label": "one-off backfill",
+      "label": "not wired up",
       "classification": "batch",
       "variant": "dashed"
     },
