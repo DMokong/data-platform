@@ -1,0 +1,257 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "dbt Two-Pass Build",
+    "output": "docs/diagrams/dbt-build.workflow.html",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "pass1",
+        "label": "Pass one",
+        "focus": [
+          "sources",
+          "staging",
+          "pre_marts",
+          "halt"
+        ],
+        "note": "Everything tagged pre_go: staging views, then the marts that need no Go output."
+      },
+      {
+        "id": "go",
+        "label": "The Go step",
+        "focus": [
+          "pre_marts",
+          "transform",
+          "derived"
+        ],
+        "note": "One Go transform reads mart Parquet and writes bronze/derived through the same Writer."
+      },
+      {
+        "id": "pass2",
+        "label": "Pass two",
+        "focus": [
+          "derived",
+          "post_marts",
+          "halt"
+        ],
+        "note": "dbt reads derived back as a declared source and builds the marts that depend on it."
+      }
+    ],
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "database": {
+          "label": "dbt model or source"
+        },
+        "backend": {
+          "label": "Go transform"
+        },
+        "security": {
+          "label": "Constraint"
+        },
+        "cloud": {
+          "label": "Files on disk"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "dbt",
+      "label": "dbt Core"
+    },
+    {
+      "id": "go",
+      "label": "Go transform"
+    },
+    {
+      "id": "store",
+      "label": "Files on disk"
+    },
+    {
+      "id": "stop",
+      "label": "Halt conditions",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "p1",
+      "label": "Pass 1 — tag:pre_go",
+      "fromCol": 0,
+      "toCol": 2,
+      "variant": "emphasis"
+    },
+    {
+      "id": "pg",
+      "label": "Go",
+      "fromCol": 3,
+      "toCol": 3
+    },
+    {
+      "id": "p2",
+      "label": "Pass 2 — tag:post_go",
+      "fromCol": 4,
+      "toCol": 4,
+      "variant": "dashed"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "sources",
+      "lane": "dbt",
+      "col": 0,
+      "type": "database",
+      "label": "sources.yml",
+      "sublabel": "external over bronze",
+      "tag": "no load step",
+      "width": 124
+    },
+    {
+      "id": "staging",
+      "lane": "dbt",
+      "col": 1,
+      "type": "database",
+      "label": "staging views",
+      "sublabel": "cast, rename, tz",
+      "width": 124
+    },
+    {
+      "id": "pre_marts",
+      "lane": "dbt",
+      "col": 2,
+      "type": "database",
+      "label": "pre_go marts",
+      "sublabel": "build then test each",
+      "width": 124
+    },
+    {
+      "id": "post_marts",
+      "lane": "dbt",
+      "col": 4,
+      "type": "database",
+      "label": "post_go marts",
+      "sublabel": "depend on derived",
+      "width": 124
+    },
+    {
+      "id": "transform",
+      "lane": "go",
+      "col": 3,
+      "type": "backend",
+      "label": "Go transform",
+      "sublabel": "free text, row logic",
+      "tag": "parquet-go",
+      "width": 124
+    },
+    {
+      "id": "derived",
+      "lane": "store",
+      "col": 3,
+      "type": "cloud",
+      "label": "bronze/derived",
+      "sublabel": "declared as a source",
+      "width": 124
+    },
+    {
+      "id": "selection",
+      "lane": "stop",
+      "col": 0,
+      "type": "security",
+      "label": "indirect_selection",
+      "sublabel": "buildable not eager",
+      "tag": "why pass 1 works",
+      "width": 124
+    },
+    {
+      "id": "halt",
+      "lane": "stop",
+      "col": 4,
+      "type": "security",
+      "label": "Pass halts",
+      "sublabel": "first failing test",
+      "tag": "dbt build",
+      "width": 124
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "sources",
+      "to": "staging",
+      "label": "read in place",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e2",
+      "from": "staging",
+      "to": "pre_marts",
+      "label": "ref()",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e3",
+      "from": "pre_marts",
+      "to": "transform",
+      "label": "reads mart Parquet",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e4",
+      "from": "transform",
+      "to": "derived",
+      "label": "same Writer, one file per window",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e5",
+      "from": "derived",
+      "to": "post_marts",
+      "label": "source(), freshness tested",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e9",
+      "from": "selection",
+      "to": "sources",
+      "label": "keeps the post_go test out of pass 1",
+      "variant": "dashed"
+    },
+    {
+      "id": "e7",
+      "from": "pre_marts",
+      "to": "halt",
+      "label": "a test fails",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "e8",
+      "from": "post_marts",
+      "to": "halt",
+      "label": "a test fails",
+      "variant": "security",
+      "role": "error",
+      "channelX": 1090
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Why two passes",
+      "items": [
+        "dbt cannot see inside a Go binary, so the Go step sits between two builds; tags are the seam",
+        "dbt build constructs each node then tests it immediately, and halts the pass on the first failure"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "The selection trap",
+      "items": [
+        "Default eager selection drags the post_go relationships test into pass 1, before its mart exists",
+        "flags.indirect_selection: buildable runs a test only once all of its parents are in the build"
+      ]
+    }
+  ]
+}

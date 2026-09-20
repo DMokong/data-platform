@@ -1,0 +1,253 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Temporal Workflow Tree",
+    "output": "docs/diagrams/temporal-workflows.sequence.html",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1080,
+      500
+    ],
+    "column_fit": "spread",
+    "views": [
+      {
+        "id": "ingest",
+        "label": "One window",
+        "focus": [
+          "win",
+          "dolt",
+          "spool",
+          "bronze"
+        ],
+        "note": "Fetch, spool, write, clean up. This is the unit Temporal retries."
+      },
+      {
+        "id": "claim-check",
+        "label": "The claim-check",
+        "focus": [
+          "win",
+          "spool",
+          "bronze"
+        ],
+        "note": "Rows go to a file; only a reference travels through the workflow payload."
+      },
+      {
+        "id": "marts",
+        "label": "Build marts",
+        "focus": [
+          "src",
+          "marts",
+          "dbt",
+          "bronze"
+        ],
+        "note": "One child workflow runs the two dbt passes with the Go transform between them."
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "sched",
+      "type": "messagebus",
+      "label": "Schedule",
+      "sublabel": "every 15 min"
+    },
+    {
+      "id": "src",
+      "type": "backend",
+      "label": "Source wf",
+      "sublabel": "MaterialiseSource"
+    },
+    {
+      "id": "win",
+      "type": "backend",
+      "label": "Window wf",
+      "sublabel": "MaterialiseWindow"
+    },
+    {
+      "id": "dolt",
+      "type": "external",
+      "label": "Beads / Dolt",
+      "sublabel": "read-only tx"
+    },
+    {
+      "id": "spool",
+      "type": "database",
+      "label": "Spool file",
+      "sublabel": "local/spool"
+    },
+    {
+      "id": "bronze",
+      "type": "cloud",
+      "label": "Bronze",
+      "sublabel": "Parquet"
+    },
+    {
+      "id": "marts",
+      "type": "backend",
+      "label": "BuildMarts",
+      "sublabel": "child workflow"
+    },
+    {
+      "id": "dbt",
+      "type": "backend",
+      "label": "dbt + Go",
+      "sublabel": "build activities"
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 194,
+      "label": "Trigger"
+    },
+    {
+      "from": 200,
+      "to": 340,
+      "label": "Per window, fanned out"
+    },
+    {
+      "from": 348,
+      "to": 436,
+      "label": "Build marts once"
+    }
+  ],
+  "messages": [
+    {
+      "from": "sched",
+      "to": "src",
+      "y": 180,
+      "label": "trigger materialise-beads",
+      "variant": "emphasis",
+      "note": "Overlap policy skip: a slow run is never doubled up."
+    },
+    {
+      "from": "src",
+      "to": "win",
+      "y": 208,
+      "label": "child MaterialiseWindow(table, window)",
+      "variant": "emphasis",
+      "note": "workflow.Now plus each grain's lookback picks the window list, so a replay picks the same windows."
+    },
+    {
+      "from": "win",
+      "to": "dolt",
+      "y": 236,
+      "label": "FetchWindow: read-only SELECT, ordered",
+      "variant": "default"
+    },
+    {
+      "from": "win",
+      "to": "spool",
+      "y": 264,
+      "label": "write rows to a spool file",
+      "variant": "emphasis"
+    },
+    {
+      "from": "spool",
+      "to": "win",
+      "y": 292,
+      "label": "SpoolRef: path, rows, fetchedAt",
+      "variant": "return",
+      "note": "The claim-check. A 6 MB window will not fit Temporal's 2 MB payload limit, so only the reference travels."
+    },
+    {
+      "from": "win",
+      "to": "bronze",
+      "y": 320,
+      "label": "WriteWindow: overwrite, then DeleteSpool",
+      "variant": "emphasis"
+    },
+    {
+      "from": "src",
+      "to": "marts",
+      "y": 356,
+      "label": "child BuildMarts(window), once windows close",
+      "variant": "emphasis"
+    },
+    {
+      "from": "marts",
+      "to": "dbt",
+      "y": 384,
+      "label": "DbtBuild(tag:pre_go), then RunTransform",
+      "variant": "default"
+    },
+    {
+      "from": "marts",
+      "to": "dbt",
+      "y": 412,
+      "label": "DbtBuild(tag:post_go)",
+      "variant": "default"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "src",
+      "from": 174,
+      "to": 426,
+      "type": "backend"
+    },
+    {
+      "participant": "win",
+      "from": 202,
+      "to": 330,
+      "type": "backend"
+    },
+    {
+      "participant": "dolt",
+      "from": 230,
+      "to": 250,
+      "type": "external"
+    },
+    {
+      "participant": "spool",
+      "from": 258,
+      "to": 300,
+      "type": "database"
+    },
+    {
+      "participant": "bronze",
+      "from": 314,
+      "to": 326,
+      "type": "cloud"
+    },
+    {
+      "participant": "marts",
+      "from": 350,
+      "to": 422,
+      "type": "backend"
+    },
+    {
+      "participant": "dbt",
+      "from": 378,
+      "to": 418,
+      "type": "backend"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "The claim-check",
+      "items": [
+        "The largest hourly window is about 6 MB, against Temporal's 2 MB payload limit",
+        "Rows go to a spool file; only a reference travels through workflow history"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Why a child per window",
+      "items": [
+        "A window is the unit of retry: one poisoned hour fails alone and its siblings land",
+        "Workflow ids derive from source and window, so a re-trigger is a no-op"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "What Temporal buys",
+      "items": [
+        "Durable state and per-activity retries instead of a bespoke loop in the Runner",
+        "A Schedule with an overlap policy replaces the ticker the design first called for"
+      ]
+    }
+  ]
+}

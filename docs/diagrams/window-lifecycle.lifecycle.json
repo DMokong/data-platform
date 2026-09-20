@@ -1,0 +1,253 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Ingestion Window Lifecycle",
+    "output": "docs/diagrams/window-lifecycle.lifecycle.html",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1080,
+      570
+    ],
+    "views": [
+      {
+        "id": "happy",
+        "label": "The ordinary path",
+        "focus": [
+          "due",
+          "fetching",
+          "spooled",
+          "written",
+          "settled"
+        ],
+        "note": "Five states from a window falling due to its file being final."
+      },
+      {
+        "id": "retry",
+        "label": "Failure and retry",
+        "focus": [
+          "fetching",
+          "activity_fail",
+          "poisoned"
+        ],
+        "note": "An activity failure retries in place; only an exhausted budget stops that one window."
+      },
+      {
+        "id": "reentry",
+        "label": "Why a settled window reopens",
+        "focus": [
+          "settled",
+          "due",
+          "written"
+        ],
+        "note": "Lookback and backfill re-enter the ordinary path and overwrite the same file."
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "Window states"
+    },
+    {
+      "id": "trouble",
+      "label": "Failure and quiet paths"
+    }
+  ],
+  "states": [
+    {
+      "id": "due",
+      "type": "start",
+      "label": "Due",
+      "sublabel": "in the lookback",
+      "lane": "main",
+      "col": 0,
+      "step": "01",
+      "tag": "schedule"
+    },
+    {
+      "id": "fetching",
+      "type": "active",
+      "label": "Fetching",
+      "sublabel": "read-only query",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "tag": "activity"
+    },
+    {
+      "id": "spooled",
+      "type": "active",
+      "label": "Spooled",
+      "sublabel": "rows on disk",
+      "lane": "main",
+      "col": 2,
+      "step": "03",
+      "tag": "claim-check"
+    },
+    {
+      "id": "written",
+      "type": "active",
+      "label": "Written",
+      "sublabel": "Parquet, renamed",
+      "lane": "main",
+      "col": 3,
+      "step": "04",
+      "tag": "atomic"
+    },
+    {
+      "id": "settled",
+      "type": "success",
+      "label": "Settled",
+      "sublabel": "past the lookback",
+      "lane": "main",
+      "col": 4,
+      "step": "05",
+      "tag": "stable"
+    },
+    {
+      "id": "activity_fail",
+      "type": "failure",
+      "label": "Activity failed",
+      "sublabel": "source down, disk full",
+      "lane": "trouble",
+      "col": 0,
+      "tag": "retryable"
+    },
+    {
+      "id": "orphan",
+      "type": "failure",
+      "label": "Orphaned spool",
+      "sublabel": "crash before delete",
+      "lane": "trouble",
+      "col": 1,
+      "tag": "disk only"
+    },
+    {
+      "id": "poisoned",
+      "type": "failure",
+      "label": "Retries exhausted",
+      "sublabel": "this window alone",
+      "lane": "trouble",
+      "col": 2,
+      "tag": "terminal"
+    }
+  ],
+  "transitions": [
+    {
+      "id": "t1",
+      "from": "due",
+      "to": "fetching",
+      "label": "FetchWindow",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        171,
+        202
+      ]
+    },
+    {
+      "id": "t2",
+      "from": "fetching",
+      "to": "spooled",
+      "label": "rows to spool",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        270,
+        202
+      ]
+    },
+    {
+      "id": "t3",
+      "from": "spooled",
+      "to": "written",
+      "label": "WriteWindow, overwrite",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        479,
+        202
+      ]
+    },
+    {
+      "id": "t4",
+      "from": "written",
+      "to": "settled",
+      "label": "lookback moves on",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        633,
+        202
+      ]
+    },
+    {
+      "id": "t5",
+      "from": "fetching",
+      "to": "activity_fail",
+      "label": "error",
+      "variant": "security",
+      "labelAt": [
+        280,
+        235
+      ]
+    },
+    {
+      "id": "t6",
+      "from": "activity_fail",
+      "to": "fetching",
+      "label": "retry in place",
+      "variant": "emphasis",
+      "labelAt": [
+        375,
+        262
+      ]
+    },
+    {
+      "id": "t7",
+      "from": "activity_fail",
+      "to": "poisoned",
+      "label": "budget spent",
+      "variant": "security",
+      "route": "bottom-channel"
+    },
+    {
+      "id": "t8",
+      "from": "written",
+      "to": "orphan",
+      "label": "crash before DeleteSpool",
+      "variant": "dashed",
+      "labelAt": [
+        556,
+        245
+      ]
+    },
+    {
+      "id": "t10",
+      "from": "settled",
+      "to": "due",
+      "label": "lookback or backfill re-enters",
+      "variant": "emphasis",
+      "route": "top-channel"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Why re-entry is safe",
+      "items": [
+        "Every path back into Due lands on the same deterministic file path, and the write overwrites it",
+        "Lookback re-enters trailing windows every run; backfill re-enters an arbitrary range, with no cleanup step"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Failure is scoped to one window",
+      "items": [
+        "Temporal retries in place; the state does not advance until the activity succeeds, and an exhausted budget stops that window alone",
+        "An orphaned spool costs disk, never correctness: the next run rewrites the same target"
+      ]
+    }
+  ]
+}

@@ -13,6 +13,15 @@ Interactive diagrams (archify; open the `.html` in a browser, the `.json` beside
 
 The two data flows are deliberately the same shape; the diff between them is the migration: bronze moves to S3, marts commit through the DuckLake catalog, and every reader (BI and Go transforms) goes through the Postgres-wire serving layer.
 
+Four more diagrams open up the orchestrator (§8) and dbt (§5), and are phase-independent:
+
+| Diagram | Type | Answers |
+|---|---|---|
+| [`diagrams/temporal-workflows.sequence.html`](diagrams/temporal-workflows.sequence.html) | sequence | What actually runs when the Schedule fires: the parent workflow, one child per window, the activities, and the spool claim-check |
+| [`diagrams/window-lifecycle.lifecycle.html`](diagrams/window-lifecycle.lifecycle.html) | lifecycle | A single window's states, where a retry re-enters, what is terminal, and why re-running is always safe |
+| [`diagrams/dbt-build.workflow.html`](diagrams/dbt-build.workflow.html) | workflow | How the two dbt passes interleave with the Go transform, where a failing test halts a pass, and the indirect-selection trap |
+| [`diagrams/adding-a-source.workflow.html`](diagrams/adding-a-source.workflow.html) | workflow | What you write to add a source or a transformation, and which components stay closed |
+
 ## Principles
 
 1. **The warehouse is the contract, not the language.** dbt models and Go transforms both read tables and write tables. Neither knows the other exists; they agree only on table names.

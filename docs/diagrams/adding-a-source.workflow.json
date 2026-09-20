@@ -1,0 +1,294 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Adding a Source",
+    "output": "docs/diagrams/adding-a-source.workflow.html",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "go",
+        "label": "The Go side",
+        "focus": [
+          "shape",
+          "fetcher",
+          "declare",
+          "register"
+        ],
+        "note": "Pick the source shape, write one Fetcher, declare its windows, register it."
+      },
+      {
+        "id": "sql",
+        "label": "The dbt side",
+        "focus": [
+          "srcyml",
+          "stg",
+          "tests",
+          "mart"
+        ],
+        "note": "Declare the raw table, add one staging model, test it, then join it into a mart."
+      },
+      {
+        "id": "nothing",
+        "label": "What you never touch",
+        "focus": [
+          "writer",
+          "workflows",
+          "register"
+        ],
+        "note": "The Writer, the Runner and the Temporal workflows are source-agnostic and stay closed."
+      }
+    ],
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "backend": {
+          "label": "Go"
+        },
+        "security": {
+          "label": "Decision or check"
+        },
+        "database": {
+          "label": "dbt model"
+        },
+        "cloud": {
+          "label": "Reused component"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "go",
+      "label": "Go: new code"
+    },
+    {
+      "id": "reuse",
+      "label": "Go: reused as-is"
+    },
+    {
+      "id": "dbt",
+      "label": "dbt: new models"
+    },
+    {
+      "id": "check",
+      "label": "Prove it",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "decide",
+      "label": "Decide",
+      "fromCol": 0,
+      "toCol": 0,
+      "variant": "emphasis"
+    },
+    {
+      "id": "extract",
+      "label": "Extract",
+      "fromCol": 1,
+      "toCol": 2
+    },
+    {
+      "id": "model",
+      "label": "Model",
+      "fromCol": 3,
+      "toCol": 5,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "shape",
+    "fetcher",
+    "declare",
+    "srcyml",
+    "stg",
+    "mart"
+  ],
+  "nodes": [
+    {
+      "id": "shape",
+      "lane": "go",
+      "col": 0,
+      "type": "security",
+      "label": "Pick the shape",
+      "sublabel": "pull, snapshot or push",
+      "tag": "spec §1",
+      "width": 130
+    },
+    {
+      "id": "fetcher",
+      "lane": "go",
+      "col": 1,
+      "type": "backend",
+      "label": "Write one Fetcher",
+      "sublabel": "query in, Batch out",
+      "width": 130
+    },
+    {
+      "id": "declare",
+      "lane": "go",
+      "col": 2,
+      "type": "backend",
+      "label": "Declare windows",
+      "sublabel": "window + lookback",
+      "width": 130
+    },
+    {
+      "id": "register",
+      "lane": "reuse",
+      "col": 2,
+      "type": "backend",
+      "label": "Register the source",
+      "sublabel": "one map entry",
+      "width": 130
+    },
+    {
+      "id": "writer",
+      "lane": "reuse",
+      "col": 1,
+      "type": "cloud",
+      "label": "Writer",
+      "sublabel": "unchanged",
+      "tag": "shared",
+      "width": 130
+    },
+    {
+      "id": "workflows",
+      "lane": "reuse",
+      "col": 0,
+      "type": "backend",
+      "label": "Runner + workflows",
+      "sublabel": "unchanged",
+      "tag": "shared",
+      "width": 130
+    },
+    {
+      "id": "srcyml",
+      "lane": "dbt",
+      "col": 3,
+      "type": "database",
+      "label": "sources.yml entry",
+      "sublabel": "path plus freshness",
+      "width": 130
+    },
+    {
+      "id": "stg",
+      "lane": "dbt",
+      "col": 4,
+      "type": "database",
+      "label": "One staging model",
+      "sublabel": "cast, rename, no joins",
+      "width": 130
+    },
+    {
+      "id": "mart",
+      "lane": "dbt",
+      "col": 5,
+      "type": "database",
+      "label": "Join into a mart",
+      "sublabel": "or add a new one",
+      "width": 130
+    },
+    {
+      "id": "tests",
+      "lane": "check",
+      "col": 4,
+      "type": "security",
+      "label": "Tests on the key",
+      "sublabel": "unique, not_null",
+      "width": 130
+    },
+    {
+      "id": "backfill",
+      "lane": "check",
+      "col": 3,
+      "type": "security",
+      "label": "Backfill and re-run",
+      "sublabel": "same files twice",
+      "tag": "the real proof",
+      "width": 130
+    }
+  ],
+  "edges": [
+    {
+      "id": "a1",
+      "from": "shape",
+      "to": "fetcher",
+      "label": "shape decides the query",
+      "variant": "emphasis"
+    },
+    {
+      "id": "a2",
+      "from": "fetcher",
+      "to": "declare",
+      "variant": "emphasis"
+    },
+    {
+      "id": "a3",
+      "from": "declare",
+      "to": "register",
+      "label": "one line",
+      "variant": "default"
+    },
+    {
+      "id": "a4",
+      "from": "declare",
+      "to": "srcyml",
+      "label": "new raw table",
+      "variant": "emphasis"
+    },
+    {
+      "id": "a5",
+      "from": "srcyml",
+      "to": "stg",
+      "variant": "emphasis"
+    },
+    {
+      "id": "a6",
+      "from": "stg",
+      "to": "mart",
+      "variant": "emphasis"
+    },
+    {
+      "id": "a7",
+      "from": "stg",
+      "to": "tests",
+      "label": "assert the key",
+      "variant": "security"
+    },
+    {
+      "id": "a8",
+      "from": "srcyml",
+      "to": "backfill",
+      "label": "prove idempotency",
+      "variant": "security"
+    },
+    {
+      "id": "a9",
+      "from": "writer",
+      "to": "fetcher",
+      "label": "reused, never edited",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "What a new source costs",
+      "items": [
+        "One Fetcher, one declaration, one sources.yml entry",
+        "The Writer, Runner and workflows stay untouched"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "The step people skip",
+      "items": [
+        "Backfill a range, run it twice, diff the files",
+        "Test the natural key before building the mart"
+      ]
+    }
+  ]
+}
