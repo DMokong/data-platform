@@ -3,13 +3,26 @@
   "diagram_type": "dataflow",
   "meta": {
     "title": "Phase 2 Data Flow",
-    "output": "docs/data-platform/diagrams/phase2.dataflow.html",
+    "output": "docs/diagrams/phase2.dataflow.html",
     "quality_profile": "showcase",
     "viewBox": [
       1080,
       540
     ],
     "views": [
+      {
+        "id": "push",
+        "label": "Push source",
+        "focus": [
+          "sns",
+          "sqs",
+          "receiver",
+          "landing",
+          "ingest",
+          "raw"
+        ],
+        "note": "SNS has no replay, so SQS buffers it and the Receiver lands JSONL; a Fetcher then windows that into bronze."
+      },
       {
         "id": "hot-path",
         "label": "Ingest to marts",
@@ -22,17 +35,6 @@
           "catalog"
         ],
         "note": "Same path as phase 1 until marts, which now commit through the DuckLake catalog."
-      },
-      {
-        "id": "serving",
-        "label": "Serving layer",
-        "focus": [
-          "marts",
-          "serving",
-          "bi",
-          "gotx"
-        ],
-        "note": "Every reader, human or Go, goes through PgBouncer and pg_duckdb over Postgres wire."
       },
       {
         "id": "go-loop",
@@ -52,7 +54,7 @@
       "label": "Sources"
     },
     {
-      "label": "Go ingestion"
+      "label": "Receive & ingest"
     },
     {
       "label": "Bronze (S3)"
@@ -66,13 +68,41 @@
   ],
   "nodes": [
     {
+      "id": "sns",
+      "type": "external",
+      "label": "SNS topic",
+      "sublabel": "no retention",
+      "stage": 0,
+      "row": 0,
+      "tag": "streaming"
+    },
+    {
       "id": "beads",
       "type": "external",
       "label": "Beads tracker",
-      "sublabel": "Dolt · MySQL wire",
+      "sublabel": "Dolt MySQL wire",
       "stage": 0,
+      "row": 2,
+      "tag": "batch"
+    },
+    {
+      "id": "sqs",
+      "type": "messagebus",
+      "label": "SQS queue",
+      "sublabel": "14-day buffer",
+      "stage": 1,
       "row": 0,
-      "tag": "history"
+      "tag": "durable"
+    },
+    {
+      "id": "receiver",
+      "type": "backend",
+      "label": "Receiver",
+      "sublabel": "write before ack",
+      "stage": 1,
+      "row": 1,
+      "tag": "Go",
+      "brand": "go"
     },
     {
       "id": "ingest",
@@ -80,25 +110,34 @@
       "label": "Fetcher → Writer",
       "sublabel": "Temporal workers",
       "stage": 1,
-      "row": 1,
+      "row": 2,
       "width": 150,
       "tag": "Go",
       "brand": "go"
     },
     {
+      "id": "landing",
+      "type": "database",
+      "label": "landing/",
+      "sublabel": "gzipped JSONL",
+      "stage": 2,
+      "row": 0,
+      "tag": "append-only"
+    },
+    {
       "id": "raw",
       "type": "database",
       "label": "bronze/raw",
-      "sublabel": "S3, dt=/hh=",
+      "sublabel": "dt= / hh=",
       "stage": 2,
-      "row": 0,
+      "row": 1,
       "tag": "immutable"
     },
     {
       "id": "derived",
       "type": "database",
       "label": "bronze/derived",
-      "sublabel": "from Go transforms",
+      "sublabel": "written by Go",
       "stage": 2,
       "row": 2,
       "tag": "derived"
@@ -128,24 +167,15 @@
       "sublabel": "RDS Postgres",
       "stage": 3,
       "row": 2,
+      "width": 150,
       "tag": "ACID",
-      "brand": "postgresql",
-      "width": 150
-    },
-    {
-      "id": "bi",
-      "type": "frontend",
-      "label": "BI tools",
-      "sublabel": "Metabase / Superset",
-      "stage": 4,
-      "row": 0,
-      "tag": "concurrent"
+      "brand": "postgresql"
     },
     {
       "id": "serving",
       "type": "security",
       "label": "pg_duckdb",
-      "sublabel": "via PgBouncer",
+      "sublabel": "PgBouncer → BI",
       "stage": 4,
       "row": 1,
       "tag": "Postgres wire",
@@ -164,12 +194,61 @@
   ],
   "flows": [
     {
+      "id": "subscribe",
+      "from": "sns",
+      "to": "sqs",
+      "label": "subscription",
+      "classification": "at least once",
+      "variant": "emphasis"
+    },
+    {
+      "id": "long-poll",
+      "from": "sqs",
+      "to": "receiver",
+      "label": "long poll",
+      "classification": "delete after write",
+      "variant": "emphasis",
+      "labelAt": [
+        315,
+        200
+      ]
+    },
+    {
+      "id": "land",
+      "from": "receiver",
+      "to": "landing",
+      "label": "batch as JSONL",
+      "classification": "never overwritten",
+      "variant": "emphasis",
+      "labelAt": [
+        500,
+        210
+      ]
+    },
+    {
+      "id": "rewindow",
+      "from": "landing",
+      "to": "ingest",
+      "label": "window by publish time",
+      "classification": "dedupe on MessageId",
+      "variant": "security",
+      "labelAt": [
+        360,
+        330
+      ],
+      "channelX": 415
+    },
+    {
       "id": "beads-history",
       "from": "beads",
       "to": "ingest",
       "label": "events, snapshots, row history",
       "classification": "per window",
-      "variant": "emphasis"
+      "variant": "emphasis",
+      "labelAt": [
+        198,
+        428
+      ]
     },
     {
       "id": "parquet-write",
@@ -177,7 +256,11 @@
       "to": "raw",
       "label": "Parquet per window",
       "classification": "IRSA, overwrite",
-      "variant": "emphasis"
+      "variant": "emphasis",
+      "labelAt": [
+        455,
+        430
+      ]
     },
     {
       "id": "read-in-place",
@@ -192,14 +275,11 @@
       "from": "staging",
       "to": "marts",
       "label": "dbt build",
-      "classification": "joins, aggregates, tests",
+      "classification": "joins, tests",
       "variant": "emphasis",
-      "fromSide": "bottom",
-      "toSide": "top",
-      "route": "straight",
       "labelAt": [
         745,
-        214
+        200
       ]
     },
     {
@@ -207,14 +287,11 @@
       "from": "marts",
       "to": "catalog",
       "label": "DuckLake commit",
-      "classification": "snapshot + file list",
+      "classification": "snapshot + files",
       "variant": "security",
-      "fromSide": "bottom",
-      "toSide": "top",
-      "route": "straight",
       "labelAt": [
         745,
-        328
+        314
       ]
     },
     {
@@ -223,26 +300,7 @@
       "to": "serving",
       "label": "snapshots",
       "classification": "via catalog",
-      "variant": "emphasis",
-      "labelAt": [
-        853,
-        314
-      ]
-    },
-    {
-      "id": "bi-read",
-      "from": "serving",
-      "to": "bi",
-      "label": "SQL",
-      "classification": "roles, RLS, audit",
-      "variant": "default",
-      "fromSide": "top",
-      "toSide": "bottom",
-      "route": "straight",
-      "labelAt": [
-        960,
-        214
-      ]
+      "variant": "emphasis"
     },
     {
       "id": "go-read",
@@ -251,12 +309,9 @@
       "label": "pgx",
       "classification": "pooled",
       "variant": "dashed",
-      "fromSide": "bottom",
-      "toSide": "top",
-      "route": "straight",
       "labelAt": [
         960,
-        328
+        314
       ]
     },
     {
@@ -274,23 +329,24 @@
       "to": "marts",
       "label": "declared dbt source",
       "classification": "freshness tested",
-      "variant": "dashed",
-      "fromSide": "top",
-      "toSide": "left",
-      "via": [
-        [
-          530,
-          271
-        ]
-      ]
+      "variant": "dashed"
     }
   ],
   "cards": [
     {
+      "dot": "amber",
+      "title": "The push source",
+      "items": [
+        "SNS keeps nothing, so the SQS subscription is what makes a past window re-readable",
+        "The Receiver writes landing/ before deleting from the queue: a crash duplicates, never loses",
+        "A Fetcher windows landing/ by publish time, dedupes on MessageId, one file per window"
+      ]
+    },
+    {
       "dot": "emerald",
       "title": "Unchanged from phase 1",
       "items": [
-        "Same Fetcher, Writer, window rules and bronze paths; only the medium moved from disk to S3",
+        "Same Fetcher, Writer and window rules; only the medium moved from disk to S3",
         "Raw is still read in place as external tables; nothing is loaded",
         "Staging and marts are the same dbt models, repointed at a DuckLake target"
       ]
@@ -299,18 +355,9 @@
       "dot": "rose",
       "title": "New in phase 2",
       "items": [
-        "Every mart build commits through the DuckLake catalog on RDS, so concurrent dbt pods are safe",
-        "A Postgres-wire serving layer (PgBouncer + pg_duckdb) sits between marts and every reader",
+        "Mart builds commit through the DuckLake catalog on RDS, so concurrent dbt pods are safe",
+        "A Postgres-wire serving layer sits between marts and every reader",
         "Auth, row-level security and audit come from Postgres roles at that layer"
-      ]
-    },
-    {
-      "dot": "amber",
-      "title": "Go transforms in phase 2",
-      "items": [
-        "Go reads marts over Postgres wire with pgx, not from S3 directly, so the catalog stays the single view of truth",
-        "Output is still Parquet to bronze/derived through the same Writer",
-        "dbt declares derived as a source, exactly as in phase 1"
       ]
     }
   ]

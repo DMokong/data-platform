@@ -3,351 +3,61 @@
   "diagram_type": "architecture",
   "meta": {
     "title": "Phase 2 Deployment",
-    "output": "docs/data-platform/diagrams/phase2.architecture.html",
+    "output": "docs/diagrams/phase2.architecture.html",
     "quality_profile": "showcase",
-    "viewBox": [
-      1240,
-      620
-    ],
+    "viewBox": [1240, 610],
     "views": [
-      {
-        "id": "ingest",
-        "label": "Ingestion",
-        "focus": [
-          "temporal",
-          "workers",
-          "beads",
-          "s3"
-        ],
-        "note": "Temporal schedules Go workers; they pull from Dolt and write Parquet to S3."
-      },
-      {
-        "id": "lakehouse",
-        "label": "Lakehouse writes",
-        "focus": [
-          "temporal",
-          "dbtpods",
-          "s3",
-          "catalog"
-        ],
-        "note": "dbt-duckdb workers read bronze in place and commit marts through the DuckLake catalog on RDS."
-      },
-      {
-        "id": "serving",
-        "label": "Serving",
-        "focus": [
-          "bi",
-          "pgbouncer",
-          "serving",
-          "catalog",
-          "workers"
-        ],
-        "note": "BI and Go transforms speak Postgres; pg_duckdb executes over DuckLake snapshots whose data lives on S3."
-      }
+      { "id": "push", "label": "Push ingestion", "focus": ["sns", "sqs", "receiver", "landing", "workers", "bronze"], "note": "SNS publishes, SQS buffers, the Receiver lands JSONL, and the same Go workers window it into bronze." },
+      { "id": "batch", "label": "Batch ingestion", "focus": ["temporal", "beads", "workers", "bronze"], "note": "Temporal schedules the same Go workers; they pull Dolt over MySQL wire and write Parquet." },
+      { "id": "lakehouse", "label": "Lakehouse writes", "focus": ["bronze", "dbtpods", "catalog"], "note": "dbt-duckdb workers read bronze in place and commit marts through the DuckLake catalog on RDS." },
+      { "id": "serving", "label": "Serving", "focus": ["bi", "pgbouncer", "serving", "catalog", "bronze"], "note": "BI speaks plain Postgres; pg_duckdb executes over DuckLake snapshots whose data lives on S3." }
     ]
   },
   "components": [
-    {
-      "id": "beads",
-      "type": "external",
-      "label": "Beads tracker",
-      "sublabel": "Dolt · MySQL wire",
-      "pos": [
-        40,
-        240
-      ],
-      "size": [
-        160,
-        62
-      ],
-      "tag": "source"
-    },
-    {
-      "id": "temporal",
-      "type": "backend",
-      "label": "Temporal server",
-      "sublabel": "Helm · state on RDS",
-      "pos": [
-        520,
-        40
-      ],
-      "size": [
-        160,
-        62
-      ],
-      "tag": "EKS Deployment"
-    },
-    {
-      "id": "workers",
-      "type": "backend",
-      "label": "Go workers",
-      "sublabel": "ingest + transforms",
-      "pos": [
-        280,
-        240
-      ],
-      "size": [
-        160,
-        62
-      ],
-      "tag": "EKS Deployment",
-      "brand": "go"
-    },
-    {
-      "id": "pgbouncer",
-      "type": "security",
-      "label": "PgBouncer",
-      "sublabel": "pooling · per-role cap",
-      "pos": [
-        520,
-        240
-      ],
-      "size": [
-        160,
-        62
-      ],
-      "tag": "EKS Deployment"
-    },
-    {
-      "id": "serving",
-      "type": "database",
-      "label": "Postgres + pg_duckdb",
-      "sublabel": "in-cluster · pg_duckdb",
-      "pos": [
-        760,
-        240
-      ],
-      "size": [
-        160,
-        62
-      ],
-      "tag": "EKS StatefulSet",
-      "brand": "postgresql"
-    },
-    {
-      "id": "dbtpods",
-      "type": "backend",
-      "label": "dbt-duckdb workers",
-      "sublabel": "BuildMarts activities",
-      "pos": [
-        1000,
-        240
-      ],
-      "size": [
-        160,
-        62
-      ],
-      "tag": "EKS Deployment"
-    },
-    {
-      "id": "bi",
-      "type": "frontend",
-      "label": "BI",
-      "sublabel": "Metabase / Superset",
-      "pos": [
-        520,
-        440
-      ],
-      "size": [
-        160,
-        62
-      ],
-      "tag": "EKS Deployment"
-    },
-    {
-      "id": "catalog",
-      "type": "database",
-      "label": "RDS Postgres",
-      "sublabel": "DuckLake catalog",
-      "pos": [
-        760,
-        440
-      ],
-      "size": [
-        160,
-        62
-      ],
-      "tag": "managed · Multi-AZ",
-      "brand": "postgresql"
-    },
-    {
-      "id": "s3",
-      "type": "cloud",
-      "label": "S3",
-      "sublabel": "bronze + ducklake",
-      "pos": [
-        1000,
-        440
-      ],
-      "size": [
-        160,
-        62
-      ],
-      "tag": "managed · ground truth"
-    }
+    { "id": "sns", "type": "cloud", "label": "SNS topic", "sublabel": "no retention", "pos": [40, 50], "size": [160, 62], "tag": "managed" },
+    { "id": "sqs", "type": "messagebus", "label": "SQS queue", "sublabel": "durable 14-day buffer", "pos": [280, 50], "size": [160, 62], "tag": "managed" },
+    { "id": "receiver", "type": "backend", "label": "Receiver", "sublabel": "write before ack", "pos": [520, 50], "size": [160, 62], "tag": "EKS Deployment", "brand": "go" },
+    { "id": "landing", "type": "cloud", "label": "S3 landing/", "sublabel": "gzipped JSONL", "pos": [760, 50], "size": [160, 62], "tag": "append-only" },
+    { "id": "beads", "type": "external", "label": "Beads tracker", "sublabel": "Dolt · MySQL wire", "pos": [40, 250], "size": [160, 62], "tag": "batch source" },
+    { "id": "workers", "type": "backend", "label": "Go workers", "sublabel": "ingest + transforms", "pos": [520, 250], "size": [160, 62], "tag": "EKS Deployment", "brand": "go" },
+    { "id": "bronze", "type": "cloud", "label": "S3 bronze/", "sublabel": "bronze + ducklake", "pos": [760, 250], "size": [160, 62], "tag": "ground truth" },
+    { "id": "dbtpods", "type": "backend", "label": "dbt-duckdb workers", "sublabel": "BuildMarts activities", "pos": [1000, 250], "size": [160, 62], "tag": "EKS · Temporal" },
+    { "id": "temporal", "type": "backend", "label": "Temporal server", "sublabel": "Helm · state on RDS", "pos": [40, 450], "size": [160, 62], "tag": "EKS Deployment" },
+    { "id": "bi", "type": "frontend", "label": "BI", "sublabel": "Metabase / Superset", "pos": [280, 450], "size": [160, 62], "tag": "EKS Deployment" },
+    { "id": "pgbouncer", "type": "security", "label": "PgBouncer", "sublabel": "per-role cap", "pos": [520, 450], "size": [160, 62], "tag": "EKS Deployment" },
+    { "id": "serving", "type": "database", "label": "Postgres + pg_duckdb", "sublabel": "in-cluster", "pos": [760, 450], "size": [160, 62], "tag": "EKS StatefulSet", "brand": "postgresql" },
+    { "id": "catalog", "type": "database", "label": "RDS Postgres", "sublabel": "DuckLake catalog", "pos": [1000, 450], "size": [160, 62], "tag": "managed · Multi-AZ", "brand": "postgresql" }
   ],
   "boundaries": [
-    {
-      "kind": "region",
-      "label": "AWS account · ap-southeast-2 · EKS pods (tagged) + managed services",
-      "wraps": [
-        "temporal",
-        "workers",
-        "pgbouncer",
-        "serving",
-        "dbtpods",
-        "bi",
-        "catalog",
-        "s3"
-      ],
-      "pad": 20
-    }
+    { "kind": "region", "label": "Push ingestion lane — new in v2", "wraps": ["sns", "sqs", "receiver", "landing"], "pad": 18 }
   ],
   "connections": [
-    {
-      "from": "temporal",
-      "to": "workers",
-      "label": "MaterialiseWindow task queue",
-      "variant": "emphasis",
-      "fromSide": "left",
-      "toSide": "top",
-      "via": [
-        [
-          360,
-          71
-        ]
-      ]
-    },
-    {
-      "from": "temporal",
-      "to": "dbtpods",
-      "label": "BuildMarts task queue",
-      "variant": "emphasis",
-      "fromSide": "right",
-      "toSide": "top",
-      "via": [
-        [
-          1080,
-          71
-        ]
-      ]
-    },
-    {
-      "from": "workers",
-      "to": "beads",
-      "label": "MySQL wire",
-      "route": "straight"
-    },
-    {
-      "from": "workers",
-      "to": "pgbouncer",
-      "label": "pgx reads marts",
-      "variant": "dashed",
-      "route": "straight"
-    },
-    {
-      "from": "pgbouncer",
-      "to": "serving",
-      "label": "pooled Postgres wire",
-      "variant": "security",
-      "route": "straight",
-      "labelAt": [
-        720,
-        236
-      ]
-    },
-    {
-      "from": "bi",
-      "to": "pgbouncer",
-      "label": "Postgres wire",
-      "route": "straight"
-    },
-    {
-      "from": "serving",
-      "to": "catalog",
-      "label": "DuckLake snapshots · data on S3",
-      "variant": "dashed",
-      "route": "straight",
-      "labelAt": [
-        840,
-        371
-      ]
-    },
-    {
-      "from": "dbtpods",
-      "to": "catalog",
-      "label": "DuckLake commits",
-      "variant": "emphasis",
-      "fromSide": "left",
-      "toSide": "right",
-      "via": [
-        [
-          960,
-          271
-        ],
-        [
-          960,
-          471
-        ]
-      ]
-    },
-    {
-      "from": "dbtpods",
-      "to": "s3",
-      "label": "reads bronze, writes marts",
-      "variant": "emphasis",
-      "route": "straight",
-      "labelAt": [
-        1080,
-        371
-      ]
-    },
-    {
-      "from": "workers",
-      "to": "s3",
-      "label": "Parquet: bronze/raw + derived (IRSA)",
-      "variant": "emphasis",
-      "fromSide": "bottom",
-      "toSide": "bottom",
-      "via": [
-        [
-          360,
-          560
-        ],
-        [
-          1080,
-          560
-        ]
-      ]
-    }
+    { "from": "sns", "to": "sqs", "label": "subscription", "variant": "emphasis", "route": "straight" },
+    { "from": "sqs", "to": "receiver", "label": "long poll", "variant": "emphasis", "route": "straight" },
+    { "from": "receiver", "to": "landing", "label": "JSONL batch", "variant": "emphasis", "route": "straight", "labelAt": [720, 126] },
+    { "from": "landing", "to": "workers", "label": "window by publish time", "variant": "security", "fromSide": "bottom", "toSide": "top", "via": [[840, 181], [600, 181]] },
+    { "from": "beads", "to": "workers", "label": "read-only MySQL wire", "route": "straight" },
+    { "from": "workers", "to": "bronze", "label": "Parquet per window", "variant": "emphasis", "route": "straight", "labelAt": [720, 326] },
+    { "from": "bronze", "to": "dbtpods", "label": "read in place", "route": "straight" },
+    { "from": "temporal", "to": "workers", "label": "MaterialiseWindow", "variant": "dashed", "fromSide": "top", "toSide": "bottom", "via": [[120, 380], [600, 380]] },
+    { "from": "bronze", "to": "serving", "label": "reads Parquet", "variant": "dashed", "route": "straight", "labelAt": [840, 390] },
+    { "from": "dbtpods", "to": "catalog", "label": "DuckLake commits", "variant": "emphasis", "route": "straight", "labelAt": [1080, 390] },
+    { "from": "bi", "to": "pgbouncer", "label": "Postgres wire", "route": "straight" },
+    { "from": "pgbouncer", "to": "serving", "label": "pooled wire", "variant": "security", "route": "straight" },
+    { "from": "serving", "to": "catalog", "label": "snapshots", "variant": "dashed", "route": "straight" }
   ],
   "cards": [
-    {
-      "dot": "cyan",
-      "title": "Stateless compute (EKS)",
-      "items": [
-        "Go workers, dbt-duckdb workers and BI are Deployments; delete any pod and Temporal reschedules the activity",
-        "Go binaries stay CGO-free: they write Parquet and read marts over Postgres wire",
-        "All pods export OTLP to Grafana Cloud (not drawn)"
-      ]
-    },
-    {
-      "dot": "emerald",
-      "title": "Two Postgres roles",
-      "items": [
-        "RDS Postgres holds the DuckLake catalog and Temporal persistence: plain tables, managed, Multi-AZ",
-        "The serving Postgres runs pg_duckdb, which RDS does not offer, so it is a pod; it holds no durable state",
-        "S3 is the ground truth; concurrent dbt pods coordinate through catalog transactions"
-      ]
-    },
-    {
-      "dot": "rose",
-      "title": "Front door and escape hatch",
-      "items": [
-        "PgBouncer and Postgres roles give auth, RLS, audit and a connection cap",
-        "Every BI tool connects as if to plain Postgres",
-        "Redshift Spectrum can read the same bronze bucket if the named triggers are hit"
-      ]
-    }
+    { "dot": "amber", "title": "The push lane (new in v2)", "items": [
+      "SNS keeps nothing, so an SQS subscription is what makes a past window re-readable at all",
+      "The Receiver writes the batch to landing/ before deleting from the queue: a crash duplicates, never loses",
+      "landing/ and bronze/ are prefixes in one bucket; the same Fetcher windows landing into bronze, so nothing downstream changes"] },
+    { "dot": "cyan", "title": "Stateless compute on EKS", "items": [
+      "Everything in ap-southeast-2: Go workers, the Receiver, dbt workers, PgBouncer and BI are Deployments",
+      "Temporal drives both lanes — MaterialiseWindow on the Go workers, BuildMarts on the dbt workers",
+      "Go binaries stay CGO-free: they write Parquet and read marts over Postgres wire"] },
+    { "dot": "emerald", "title": "Two Postgres roles", "items": [
+      "RDS Postgres holds the DuckLake catalog and Temporal persistence: plain tables, managed, Multi-AZ",
+      "The serving Postgres runs pg_duckdb, which RDS does not offer, so it is a pod; it holds no durable state",
+      "Redshift Spectrum can still read the same bronze bucket if the named triggers are hit"] }
   ]
 }
